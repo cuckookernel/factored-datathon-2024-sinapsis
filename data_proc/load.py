@@ -21,6 +21,9 @@ ColNameMode: TypeAlias = Literal["orig", "snake_case"]
 
 def _interactive_run_load() -> None:
     # %%
+    # noinspection PyUnresolvedReferences
+    runfile("data_proc/load.py")
+    # %%
     import sys
 
     from dotenv import load_dotenv
@@ -29,29 +32,31 @@ def _interactive_run_load() -> None:
     # %%
     # data_dir = Path(os.environ['DATA_DIR'])
     # gdelt_data_dir = data_dir / 'GDELT'
-    typ = "events"
+    typ: GdeltV1Type = "gkgcounts"
     print(typ)
     # %%
-    schema_df = load_schema(typ="events", column_name_mode='snake_case')
+    schema_df = load_schema(typ=typ)
     cols = schema_df['column']
+    print(cols)
     # %%
     rows_per_chunk = 100000
-    src_path = gdelt_base_data_path() / 'last_5yrs/raw_data'
+    src_path = gdelt_base_data_path() / 'events_aug2024'
     # %%
-    csv_paths =list(src_path.glob('*.zip'))
+    csv_paths =list((src_path / 'raw_data').glob('*.zip'))
     csv_path = csv_paths[0]
+    # %%
     df = pd.read_csv(csv_path, sep='\t', names=list(schema_df['column']),)
                      # dtype={"GLOBALEVENTID": int})
     dtype_map = dict(zip(schema_df['column'], schema_df['pandas_type']))
-    # 5%
-    save_parquet_chunks(typ, rows_per_chunk, src_path, limit=100)
+    # %%
+    save_parquet_chunks(typ, rows_per_chunk, src_path / 'raw_data', limit=100,
+                        verbose=1)
     # %%
     for col in df.columns:
         df[col] = df[col].astype('str')
 
     # %%
     data = []
-
     with Path('/home/teo/data/GDELT/20220915.export.CSV').open('rt') as f_int:
         for i, line in enumerate(f_int.readlines()):
             parts = line.split("\t")
@@ -75,7 +80,6 @@ def _interactive_run_load() -> None:
         if cnt > 0:
             print(f"{col}: {cnt}")
     # %%
-
     for _, row in schema_df[['column', 'snake_col_name']].iterrows():
         print(list(row))
 # %%
@@ -123,7 +127,7 @@ def save_parquet_chunks(typ: GdeltV1Type,
 
     ret_stats = SaveParquetStats()
 
-    for i, (df, path) in enumerate(df_iter_from_raw_files("events", src_path=src_path)):
+    for i, (df, path) in enumerate(df_iter_from_raw_files(typ, src_path=src_path)):
         date_str, sampled_suffix = interpret_fname(path)
         date_strs.append(date_str)
         chunk_dfs.append(df)
@@ -156,9 +160,6 @@ def save_parquet_chunks(typ: GdeltV1Type,
     return ret_stats
 
 
-# %%
-
-
 def df_iter_from_raw_files(typ: GdeltV1Type,
                    src_path: Path,
                    column_name_mode: ColNameMode = "snake_case",
@@ -181,14 +182,17 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     A tuple containing a DataFrame with concatenated data and a list of file names.
 
     """
-    schema_df = load_schema(typ, column_name_mode)
+    # %%
+    schema_df = load_schema(typ)
     suffix = "export" if typ == "events" else typ
 
     glob_patterns = [f'*.{suffix}.CSV.zip', f'*.{suffix}.CSV.sampled_*.*.zip']
     raw_fpaths = sorted(list(src_path.glob(glob_patterns[0]))
                         + list(src_path.glob(glob_patterns[1])))
     if len(raw_fpaths) == 0:
-        L.warning("raw_paths is empty, glob_patterns='{glob_patterns}'")
+        L.warning("raw_paths is empty, src_path='%s', glob_patterns=%s",
+                  src_path, glob_patterns)
+    # %%
 
     col_names, dtype_map = get_cols_and_types(schema_df, column_name_mode)
 
@@ -224,7 +228,6 @@ def interpret_fname(path: Path) -> tuple[str, str]:
     else:
         return date_str, ""
 
-# %%
 def get_cols_and_types(schema_df: DataFrame,
                        col_name_mode: ColNameMode) -> tuple[list[str], dict[str, dtype]]:
     """Extract column names and their corresponding data types from a schema DataFrame.
@@ -268,19 +271,18 @@ TYPE_DESC_TO_NP_TYPE: dict[str, dtype] = {
     "float64": np.dtype('float64'),
 }
 
-
-TYP_TO_SCHEMA = {
-    "events": "docs/schema_files/GDELT_v1.events.columns.csv"
+# %%
+TYP_TO_SCHEMA_PATH: dict[GdeltV1Type, str] = {
+    "events": "docs/schema_files/GDELT_v1.events.columns.csv",
+    "gkgcounts": "docs/schema_files/GDELT_v1.gkgcounts.columns.csv"
 }
 
 
-def load_schema(typ: GdeltV1Type,
-                column_name_mode: ColNameMode) -> DataFrame:
-    """Load the schema for GDELT 2.0 data based on the specified type.
+def load_schema(typ: GdeltV1Type) -> DataFrame:
+    """Load the schema for GDELT 1.0 data based on the specified type.
 
     Args:
     ----
-        gdelt_data_dir (Path): The directory containing the GDELT data.
         typ (Gdelt2FileType): The type of GDELT data to load the schema for.
 
     Returns:
@@ -288,10 +290,8 @@ def load_schema(typ: GdeltV1Type,
         DataFrame: The schema DataFrame with renamed columns and mapped data types.
 
     """
-
-    local_path = TYP_TO_SCHEMA[typ]
+    local_path = TYP_TO_SCHEMA_PATH[typ]
     schema_df = pd.read_csv(local_path)
-
 
     if 'col_renamed' in schema_df:
         schema_df['snake_col_name'] = schema_df['col_renamed']
@@ -315,7 +315,6 @@ def load_schema(typ: GdeltV1Type,
     return schema_df
 
 
-# %%
 def rename_col(col: str, col_renames: Mapping[str, str]) -> str:
     """Rename a column based on a mapping or convert it to snake_case if not found.
 
@@ -357,5 +356,3 @@ def camel_to_snake_case(identifier: str) -> str:
     step2 = re.sub(r'(?<!^)(?=[A-Z])', '_', step1b).lower()
 
     return re.sub(r'_{2,}', '_', step2)
-
-# %%

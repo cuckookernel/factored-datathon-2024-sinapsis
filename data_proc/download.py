@@ -46,10 +46,15 @@ def _interactive_testing() -> None:
 def get_file_catalog(typ: GdeltV1Type, redownload: bool = False) -> DataFrame:
     """Get file catalog either from local disc or via download_file_catalog()"""
     url_segment = "gkg" if typ == "gkgcounts" else typ
-    local_catalog_path = gdelt_base_data_path() / f"file_catalog.{typ}.parquet"
+    local_catalog_path: Path = gdelt_base_data_path() / f"file_catalog.{typ}.parquet"
 
-    if local_catalog_path.exists() and not redownload:
-        return pd.read_parquet(local_catalog_path).set_index("date_str")
+    if local_catalog_path.exists():
+        modif_time = DateTime.fromtimestamp(local_catalog_path.lstat().st_mtime, tz=UTC)
+
+        if (DateTime.now(tz=UTC) - modif_time).total_seconds() < 3 * 3600 and not redownload:
+            L.info("Loading catalog for typ: %s from:'%s' (modified: %s)",
+                   typ, local_catalog_path, modif_time.isoformat())
+            return pd.read_parquet(local_catalog_path).set_index("date_str")
 
     type_base_url = f"{BASE_URL}/{url_segment}"
     catalog_df = download_file_catalog(type_base_url, typ)
