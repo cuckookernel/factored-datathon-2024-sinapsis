@@ -1,0 +1,10 @@
+beautifulsoup4==4.12.3
+mypy==1.11.1  # static type checking for better quality code
+pandas==2.2.2
+pandas-stubs~=2.2.2
+pyarrow==17.0.0
+python-dotenv==1.0.1
+requests==2.31.0
+types-requests
+types-beautifulsoup4
+rich==13.7.1  # colored logging
