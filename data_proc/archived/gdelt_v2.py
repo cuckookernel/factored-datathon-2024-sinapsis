@@ -1,8 +1,7 @@
 """Code that work for gdelt_v2"""
 
 import random
-from datetime import date
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import requests

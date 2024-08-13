@@ -3,12 +3,14 @@
 import os
 import re
 import zipfile
+from collections.abc import Generator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, TypeAlias, Mapping, Generator, Optional
+from typing import Literal, Optional, TypeAlias
 
 import numpy as np
-from numpy import dtype
 import pandas as pd
+from numpy import dtype
 from pandas import DataFrame
 
 from data_proc.common import GdeltV1Type, gdelt_base_data_path
@@ -22,7 +24,7 @@ ColNameMode: TypeAlias = Literal["orig", "snake_case"]
 def _interactive_run_load() -> None:
     # %%
     # noinspection PyUnresolvedReferences
-    runfile("data_proc/load.py")
+    runfile("data_proc/load.py") # noqa: F821
     # %%
     import sys
 
@@ -32,7 +34,7 @@ def _interactive_run_load() -> None:
     # %%
     # data_dir = Path(os.environ['DATA_DIR'])
     # gdelt_data_dir = data_dir / 'GDELT'
-    typ: GdeltV1Type = "gkgcounts"
+    typ: GdeltV1Type = "gkg"
     print(typ)
     # %%
     schema_df = load_schema(typ=typ)
@@ -45,37 +47,16 @@ def _interactive_run_load() -> None:
     csv_paths =list((src_path / 'raw_data').glob('*.zip'))
     csv_path = csv_paths[0]
     # %%
-    df = pd.read_csv(csv_path, sep='\t', names=list(schema_df['column']),)
-                     # dtype={"GLOBALEVENTID": int})
-    dtype_map = dict(zip(schema_df['column'], schema_df['pandas_type']))
+    one_df = pd.read_csv(csv_path, sep='\t', names=list(schema_df['column']))
+                        # dtype={"GLOBALEVENTID": int})
+    dtype_map = dict(zip(schema_df['column'], schema_df['pandas_type'], strict=False))
+    print(dtype_map)
     # %%
     save_parquet_chunks(typ, rows_per_chunk, src_path / 'raw_data', limit=100,
                         verbose=1)
     # %%
-    for col in df.columns:
-        df[col] = df[col].astype('str')
-
-    # %%
-    data = []
-    with Path('/home/teo/data/GDELT/20220915.export.CSV').open('rt') as f_int:
-        for i, line in enumerate(f_int.readlines()):
-            parts = line.split("\t")
-            if len(parts) != 58:
-                print(len(parts), parts)
-            data.append(parts)
-            if line.startswith('GOV'):
-                print(f"line: {i}  `{line}`")
-    # %%
-    df_man = pd.DataFrame(data, columns=list(schema_df['column']))
-    # %%
-    for i, row in enumerate(data):
-        if row[0] == 'GOV':
-            print(i, row)
-
-
-    # %%
-    for col in df.columns:
-        cnt = (df[col] == 'GOV').sum()
+    for col in one_df.columns:
+        cnt = (one_df[col] == 'GOV').sum()
 
         if cnt > 0:
             print(f"{col}: {cnt}")
@@ -83,10 +64,11 @@ def _interactive_run_load() -> None:
     for _, row in schema_df[['column', 'snake_col_name']].iterrows():
         print(list(row))
 # %%
-from dataclasses import dataclass
 
 @dataclass
 class SaveParquetStats:
+    """Cnts of stuff kept while saving parquets"""
+
     raw_file_cnt: int =0
     raw_bytes_read: int = 0
     row_cnt: int = 0
@@ -96,17 +78,19 @@ class SaveParquetStats:
 
     def inc_raw(self, file_cnt: int,
             bytes_read: int, row_cnt: int) -> None:
-
+        """Increment raw data reading stats"""
         self.raw_file_cnt += file_cnt
         self.raw_bytes_read += bytes_read
         self.row_cnt += row_cnt
 
     def inc_parquet(self, file_cnt: int, bytes_written: int, row_cnt: int) -> None:
+        """Increment parquet writing stats"""
         self.parquet_file_cnt += file_cnt
         self.parquet_bytes_written += bytes_written
         self.parquet_rows_written += row_cnt
 
-    def log(self):
+    def log(self) -> None:
+        """Log the stats"""
         L.info("%r compression:%.4g", self,
                self.parquet_bytes_written / self.raw_bytes_read)
 
@@ -115,7 +99,7 @@ def save_parquet_chunks(typ: GdeltV1Type,
                         src_path: Path,
                         limit: Optional[int],
                         verbose: int = 0) -> SaveParquetStats:
-
+    """Convert raw files under src_path to parquets trying to consolidate at least rows_per_count rows in each parquet""" # noqa: E501
     dst_dir_path = src_path.parent / 'raw_parquet'
     dst_dir_path.mkdir(exist_ok=True, parents=True)
 
@@ -138,7 +122,7 @@ def save_parquet_chunks(typ: GdeltV1Type,
 
         if chunk_row_cnt > rows_per_chunk or (limit is not None and i >= limit):
             chunk_df_out: DataFrame = pd.concat(chunk_dfs)
-            assert isinstance(chunk_df_out, DataFrame)
+            assert isinstance(chunk_df_out, DataFrame) # noqa: S101 - for typecheckers benefit
             fname_out = f"{min(date_strs)}-{max(date_strs)}.{type_suffix}{sampled_suffix}.parquet"
             chunk_path_out = dst_dir_path / fname_out
             if verbose > 0:
@@ -161,10 +145,10 @@ def save_parquet_chunks(typ: GdeltV1Type,
 
 
 def df_iter_from_raw_files(typ: GdeltV1Type,
-                   src_path: Path,
-                   column_name_mode: ColNameMode = "snake_case",
-                   verbose: int = 0,
-                   ) -> Generator[tuple[DataFrame, Path], None, None]:
+                           src_path: Path,
+                           column_name_mode: ColNameMode = "snake_case",
+                           verbose: int = 0,
+                           ) -> Generator[tuple[DataFrame, Path], None, None]:
     """Load raw data files based on the specified GDELT type and schema.
 
     Raw data here means '.CSV.zip' files.
@@ -174,6 +158,7 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
         typ: Type of GDELT data to load (events, gkg, mentions).
         rename_cols: Boolean flag to indicate whether to rename columns based on schema.
         src_path: Path to the raw data files.
+        column_name_mode: Whether to use original names or camel case names
         raw_fpaths: Optional list of paths to raw data files.
         verbose (int): Verbosity level
 
@@ -186,9 +171,9 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     schema_df = load_schema(typ)
     suffix = "export" if typ == "events" else typ
 
-    glob_patterns = [f'*.{suffix}.CSV.zip', f'*.{suffix}.CSV.sampled_*.*.zip']
-    raw_fpaths = sorted(list(src_path.glob(glob_patterns[0]))
-                        + list(src_path.glob(glob_patterns[1])))
+    glob_patterns = [f'*.{suffix}.CSV.zip', f'*.{suffix}.csv.zip',
+                     f'*.{suffix}.CSV.sampled_*.*.zip', f'*.{suffix}.csv.sampled_*.*.zip']
+    raw_fpaths = sorted([fpath for pat in glob_patterns for fpath in src_path.glob(pat)])
     if len(raw_fpaths) == 0:
         L.warning("raw_paths is empty, src_path='%s', glob_patterns=%s",
                   src_path, glob_patterns)
@@ -201,7 +186,12 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             if fpath.lstat().st_size == 0:
                 L.info(f"WARN: Skipping empty file: {fpath}")
                 continue
-            interval_df = pd.read_csv(fpath, sep='\t', names=col_names, dtype=dtype_map)
+            if typ != 'gkg':
+                interval_df = pd.read_csv(fpath, sep='\t', names=col_names, dtype=dtype_map)
+            else:
+                interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
+                                          dtype=dtype_map, header=1)
+
         except zipfile.BadZipFile:
             L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
             continue
@@ -209,9 +199,12 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             if err.args[0].startswith('Zero files found'):
                 L.warning("Zero files found in fpath: %s, skipping", fpath)
                 continue
+            else:
+                L.error(f"When reading: {fpath}")
+                raise
         except Exception as exc:
-            L.error(f"Exception reading parquet from path: %s\n%s", fpath, exc.args)
-            raise exc
+            L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
+            raise
 
         if verbose > 1:
             L.info(f'fname: {fpath.name} - {interval_df.shape[0]} records')
@@ -222,7 +215,7 @@ def interpret_fname(path: Path) -> tuple[str, str]:
     """Extract date_str and sample suffix from filename"""
     fname = path.name
     date_str = fname.split('.')[0]
-    mch = re.search(f'(\.sampled_[0-9.]+)\.zip', fname)
+    mch = re.search(r'(\.sampled_[0-9.]+)\.zip', fname)
     if mch:
         return date_str, mch.group(1)
     else:
@@ -235,7 +228,8 @@ def get_cols_and_types(schema_df: DataFrame,
     Args:
     ----
         schema_df (DataFrame): The DataFrame containing schema information.
-        rename_cols (bool): A flag indicating whether to use snake_case column names.
+        col_name_mode (ColNameMode): A flag indicating whether to use original or
+            snake_case column names.
 
     Returns:
     -------
@@ -272,10 +266,8 @@ TYPE_DESC_TO_NP_TYPE: dict[str, dtype] = {
 }
 
 # %%
-TYP_TO_SCHEMA_PATH: dict[GdeltV1Type, str] = {
-    "events": "docs/schema_files/GDELT_v1.events.columns.csv",
-    "gkgcounts": "docs/schema_files/GDELT_v1.gkgcounts.columns.csv"
-}
+def schema_path(typ: GdeltV1Type) -> Path:
+    return Path(f"docs/schema_files/GDELT_v1.{typ}.columns.csv")
 
 
 def load_schema(typ: GdeltV1Type) -> DataFrame:
@@ -290,8 +282,10 @@ def load_schema(typ: GdeltV1Type) -> DataFrame:
         DataFrame: The schema DataFrame with renamed columns and mapped data types.
 
     """
-    local_path = TYP_TO_SCHEMA_PATH[typ]
+    # %%
+    local_path = schema_path(typ)
     schema_df = pd.read_csv(local_path)
+    # %%
 
     if 'col_renamed' in schema_df:
         schema_df['snake_col_name'] = schema_df['col_renamed']

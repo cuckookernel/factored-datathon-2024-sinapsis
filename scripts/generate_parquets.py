@@ -28,6 +28,8 @@ def generate_parquets(file_type: GdeltV1Type,
     ----
         file_type: Gdelt2FileType - The type of GDELT2 file to process.
         src_path: str - The directory where the raw .CSV.zip files are stored.
+        limit: int - generate at most this many files (use for quick tests)
+        rows_per_file: int - Try to produce parquet files with at least this many lines each
         verbose: int - Verbosity level (default is 0).
 
     """
