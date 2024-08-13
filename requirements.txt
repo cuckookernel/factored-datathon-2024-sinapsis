@@ -1,10 +1,11 @@
 beautifulsoup4==4.12.3
+click==8.1.7 # CLI construction
 mypy==1.11.1  # static type checking for better quality code
 pandas==2.2.2
 pandas-stubs~=2.2.2
 pyarrow==17.0.0
 python-dotenv==1.0.1
 requests==2.31.0
-types-requests
+types-requests~=2.31
 types-beautifulsoup4
 rich==13.7.1  # colored logging

@@ -1,5 +1,11 @@
-# gdelthon
-Mateam's repo for Factored's 2024 Datathon, on GDELT Data
+# Team Sinapsis - Factored's Datathon 2024
+
+Team Members
+
+  - Tomas Zubik - (github: [tomaszbk](https://github.com/tomaszbk)) - Argentina
+  - William Mateus - (github: [willmateusav](https://github.com/willmateusav)) - Colombia
+  - Adrian Rojas Fernández - (github:[flakoash](https://github.com/flakoash) ) - Argentina
+  - Mateo Restepo - (github: [cuckookernel](https://github.com/cuckookernel)) - Colombia
 
 
 # Virtual environment setup
@@ -7,6 +13,7 @@ Mateam's repo for Factored's 2024 Datathon, on GDELT Data
 Highly recommended!
 
 1.  Verify python version is 3.10. If not, download that version of Python (but not too recent, e.g. NOT 3.12 or 3.13 as some libraries might not be available for the newest versions of Python)
+S's repo for Factored's 2024 Datathon, on GDELT Data
 
 ```bash
 python3 --version
@@ -46,4 +53,3 @@ export PYTHONPATH='./'  # So that python can resolve imports such as `from data_
 ```
 
 On Windows, define these variables directly using the Windows system app for that...
-
