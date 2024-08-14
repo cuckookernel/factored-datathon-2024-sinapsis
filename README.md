@@ -4,7 +4,7 @@ Team Members
 
   - Tomas Zubik - (github: [tomaszbk](https://github.com/tomaszbk)) - [linkedin](https://www.linkedin.com/in/tomas-zubik/) - Argentina 
   - William Mateus - (github: [willmateusav](https://github.com/willmateusav)) - [linkedin](https://www.linkedin.com/in/william-mateus-avila-5a762ba3/) - Colombia 
-  - Adrian Rojas Fernández - (github:[flakoash](https://github.com/flakoash) ) - Argentina 
+  - Adrian Rojas Fernández - (github:[flakoash](https://github.com/flakoash) ) - [linkedin](https://www.linkedin.com/in/adrian-rojas-fernandez/) - Bolivia
   - Mateo Restepo - (github: [cuckookernel](https://github.com/cuckookernel)) - [linkedin](https://www.linkedin.com/in/mateorestrepo/) Colombia
 
 
