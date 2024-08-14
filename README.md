@@ -7,6 +7,22 @@ Team Members
   - Adrian Rojas Fernández - (github:[flakoash](https://github.com/flakoash) ) - [linkedin](https://www.linkedin.com/in/adrian-rojas-fernandez/) - Bolivia
   - Mateo Restepo - (github: [cuckookernel](https://github.com/cuckookernel)) - [linkedin](https://www.linkedin.com/in/mateorestrepo/) Colombia
 
+# Useful links
+
+Data Sources:
+- GDELT 1.0 GKG: http://data.gdeltproject.org/gkg/index.html
+- Dataset description: http://data.gdeltproject.org/documentation/GDELT-Global_Knowledge_Graph_Codebook.pdf
+
+- GDELT 1.0 Events: http://data.gdeltproject.org/events/index.html
+- Dataset description: http://data.gdeltproject.org/documentation/GDELT-Data_Format_Codebook.pdf
+- Data Headers: https://www.gdeltproject.org/data/lookups/CSV.header.dailyupdates.txt
+
+# Data Pipeline Architecture Prototype
+
+- Apache Airflow / databricks jobs
+- Databricks, medallion architecture, amazon s3
+- Data Quality assessment with Soda, great expectations or Delta Live Tables
+- Data governance, including security, access, discoverability, and documentation (?)
 
 # Virtual environment setup
 
