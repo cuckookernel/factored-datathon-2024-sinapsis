@@ -8,7 +8,7 @@ import click
 from pandas import DataFrame
 
 from data_proc.common import GdeltV1Type
-from data_proc.load import save_parquet_chunks
+from data_proc.load import ParquetChunkGenerator
 
 
 @click.command()
@@ -35,8 +35,10 @@ def generate_parquets(file_type: GdeltV1Type,
     """
     src_path1 = src_path / 'raw_data'
 
-    stats = save_parquet_chunks(file_type, rows_per_file, src_path=src_path1, limit=limit,
-                                verbose=verbose)
+    pq_generator = ParquetChunkGenerator(typ=file_type, src_path=src_path)
+
+    stats = pq_generator.save_parquet_chunks(rows_per_file=rows_per_file)
+
     stats.log()
 
 

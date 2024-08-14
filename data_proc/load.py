@@ -3,7 +3,7 @@
 import os
 import re
 import zipfile
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Mapping, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, TypeAlias
@@ -13,7 +13,7 @@ import pandas as pd
 from numpy import dtype
 from pandas import DataFrame
 
-from data_proc.common import GdeltV1Type, gdelt_base_data_path
+from data_proc.common import GdeltV1Type, gdelt_base_data_path, NaN
 from shared import logging
 
 L = logging.getLogger("load")
@@ -94,54 +94,70 @@ class SaveParquetStats:
         L.info("%r compression:%.4g", self,
                self.parquet_bytes_written / self.raw_bytes_read)
 
-def save_parquet_chunks(typ: GdeltV1Type,
-                        rows_per_chunk: int,
-                        src_path: Path,
-                        limit: Optional[int],
-                        verbose: int = 0) -> SaveParquetStats:
-    """Convert raw files under src_path to parquets trying to consolidate at least rows_per_count rows in each parquet""" # noqa: E501
-    dst_dir_path = src_path.parent / 'raw_parquet'
-    dst_dir_path.mkdir(exist_ok=True, parents=True)
 
-    type_suffix = "export" if typ == "events" else typ
-    chunk_idx = 0
-    chunk_row_cnt = 0
-    chunk_dfs = []
-    date_strs = []
+class ParquetChunkGenerator:
+    def __init__(self, typ: GdeltV1Type, src_path: Path):
+        self.typ = typ
+        self.src_path = src_path
+        self.dst_dir_path = src_path.parent / 'raw_parquet'
+        self.dst_dir_path.mkdir(exist_ok=True, parents=True)
 
-    ret_stats = SaveParquetStats()
+        self.type_suffix = "export" if typ == "events" else typ
 
-    for i, (df, path) in enumerate(df_iter_from_raw_files(typ, src_path=src_path)):
-        date_str, sampled_suffix = interpret_fname(path)
-        date_strs.append(date_str)
-        chunk_dfs.append(df)
-        chunk_row_cnt += df.shape[0]
-        ret_stats.inc_raw(file_cnt=1,
-                          bytes_read=path.lstat().st_size,
-                          row_cnt=df.shape[0])
+        self.chunk_dfs: list[DataFrame] = []
+        self.date_strs: list[str] = []
+        self.ret_stats = SaveParquetStats()
+        self.chunk_idx = 0
 
-        if chunk_row_cnt > rows_per_chunk or (limit is not None and i >= limit):
-            chunk_df_out: DataFrame = pd.concat(chunk_dfs)
-            assert isinstance(chunk_df_out, DataFrame) # noqa: S101 - for typecheckers benefit
-            fname_out = f"{min(date_strs)}-{max(date_strs)}.{type_suffix}{sampled_suffix}.parquet"
-            chunk_path_out = dst_dir_path / fname_out
-            if verbose > 0:
-                L.info("Saving parquet chunk: %s", chunk_path_out)
-            if verbose > 1:
-                ret_stats.log()
-            chunk_df_out.to_parquet(chunk_path_out)
-            ret_stats.inc_parquet(file_cnt=1,
-                                  bytes_written=chunk_path_out.lstat().st_size,
-                                  row_cnt=chunk_df_out.shape[0])
-            chunk_dfs = []
-            date_strs = []
-            chunk_row_cnt = 0
-            chunk_idx += 1
+    def save_parquet_chunks(self, rows_per_file: int,
+                            limit: Optional[int] = None,
+                            verbose: int = 0) -> SaveParquetStats:
+        """Convert raw files under src_path to parquets trying to consolidate at least rows_per_count rows in each parquet""" # noqa: E501
 
-        if limit is not None and i >= limit:
-            break
 
-    return ret_stats
+        chunk_row_cnt = 0
+
+        sampled_suffix = "undefined"  # Will be defined if we actually need it below
+        for i, (df, path) in enumerate(df_iter_from_raw_files(self.typ, src_path=self.src_path)):
+            date_str, sampled_suffix = interpret_fname(path)
+            self.date_strs.append(date_str)
+            self.chunk_dfs.append(df)
+            chunk_row_cnt += df.shape[0]
+            self.ret_stats.inc_raw(file_cnt=1,
+                                   bytes_read=path.lstat().st_size,
+                                   row_cnt=df.shape[0])
+
+            if chunk_row_cnt > rows_per_file or (limit is not None and i >= limit):
+                self._save_1_parquet_chunk(sampled_suffix, verbose)
+
+            if limit is not None and i >= limit:
+                break
+
+        if len(self.chunk_dfs) != 0:
+            self._save_1_parquet_chunk(sampled_suffix, verbose)
+
+        return self.ret_stats
+
+    def _save_1_parquet_chunk(self, sampled_suffix: str, verbose: int = 0) -> None:
+        chunk_df_out: DataFrame = pd.concat(self.chunk_dfs)
+        assert isinstance(chunk_df_out, DataFrame)  # noqa: S101 - for typecheckers benefit
+        fname_out = (f"{min(self.date_strs)}-{max(self.date_strs)}"
+                     f".{self.type_suffix}{sampled_suffix}.parquet")
+        chunk_path_out = self.dst_dir_path / fname_out
+
+        if verbose > 0:
+            L.info("Saving parquet chunk: %s", chunk_path_out)
+        chunk_df_out.to_parquet(chunk_path_out)
+
+        self.ret_stats.inc_parquet(file_cnt=1,
+                                   bytes_written=chunk_path_out.lstat().st_size,
+                                   row_cnt=chunk_df_out.shape[0])
+        if verbose > 1:
+            self.ret_stats.log()
+
+        self.chunk_dfs = []
+        self.date_strs = []
+        self.chunk_row_cnt = 0
 
 
 def df_iter_from_raw_files(typ: GdeltV1Type,
@@ -179,8 +195,9 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
                   src_path, glob_patterns)
     # %%
 
-    col_names, dtype_map = get_cols_and_types(schema_df, column_name_mode)
-    L.info(f"col_names={col_names}")
+    col_names, dtype_map, converters = get_cols_and_types(schema_df, column_name_mode)
+
+    L.info(f"col_names=%s, converters=%s", col_names, converters)
 
     for fpath in raw_fpaths:
         try:
@@ -188,7 +205,8 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
                 L.info(f"WARN: Skipping empty file: {fpath}")
                 continue
             if typ == 'events':
-                interval_df = pd.read_csv(fpath, sep='\t', names=col_names, dtype=dtype_map)
+                interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
+                                          dtype=dtype_map, converters=converters)
             else:
                 interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
                                           dtype=dtype_map, header=1)
@@ -202,7 +220,7 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
                 continue
             else:
                 L.error(f"When reading: {fpath}\nerror msg: {err.args[0]}")
-                diagnose_problem(fpath, col_names)
+                diagnose_problem(fpath, col_names, dtypes=dtype_map)
                 raise
         except Exception as exc:
             L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
@@ -214,7 +232,22 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
         yield interval_df, fpath
 
 
-def diagnose_problem(fpath: Path, col_names: list[str]):
+def ensure_float(a_str: str) -> float:
+    """Converter to ensure we get a float from a string (when loading csv)"""
+    if a_str == '':
+        return NaN
+    try:
+        return float(a_str)
+    except ValueError as err:
+        L.info(f"a_str=%s is not a float, attempting cleanup", a_str)
+        a_clean = re.sub("[^0-9-.]", "", a_str)
+        try:
+            return float(a_clean)
+        except ValueError as a_str:
+            L.info("a_str=%s is not a float after cleanup", a_clean)
+            return NaN
+
+def diagnose_problem(fpath: Path, col_names: list[str], dtypes: dict[str, dtype]):
     n_cols = len(col_names)
     L.info(f"col_names has: {n_cols}: {col_names}")
     data_df = pd.read_csv(fpath, sep="\t")
@@ -225,7 +258,16 @@ def diagnose_problem(fpath: Path, col_names: list[str]):
 
     if n_cols == n_cols_file:
         data_df = pd.read_csv(fpath, names=col_names, sep="\t")
-        print(data_df.iloc[1])
+        print("row 1", data_df.iloc[1])
+
+        for col,dtyp in dtypes.items():
+            if dtyp == np.float64:
+                try:
+                    float_series = data_df[col].astype(np.float64)
+                    L.info("col: `%s` # ok values: %d", col, (~float_series.isnull()).sum())
+                except ValueError as err:
+                    L.error("col: `%s`  error: %s", col, err.args[0])
+
 
 def interpret_fname(path: Path) -> tuple[str, str]:
     """Extract date_str and sample suffix from filename"""
@@ -238,7 +280,8 @@ def interpret_fname(path: Path) -> tuple[str, str]:
         return date_str, ""
 
 def get_cols_and_types(schema_df: DataFrame,
-                       col_name_mode: ColNameMode) -> tuple[list[str], dict[str, dtype]]:
+                       col_name_mode: ColNameMode
+                       ) -> tuple[list[str], dict[str, dtype], dict[str, Callable]]:
     """Extract column names and their corresponding data types from a schema DataFrame.
 
     Args:
@@ -258,10 +301,17 @@ def get_cols_and_types(schema_df: DataFrame,
                                 else schema_df['column'])
 
     col_2_type_desc: dict[str, str] = dict(zip(col_names, schema_df["pandas_type"], strict=True))
-    dtype_map = {col: TYPE_DESC_TO_NP_TYPE[type_desc]
-                 for col, type_desc in col_2_type_desc.items()}
+    dtype_map = {col: TYPE_DESC_TO_NP_TYPE[pandas_type_desc]
+                 for col, pandas_type_desc in col_2_type_desc.items()
+                 if not pandas_type_desc.startswith('float')}
 
-    return col_names, dtype_map
+    converters = {
+        col: ensure_float
+        for col, pandas_type_desc in col_2_type_desc.items()
+        if pandas_type_desc.startswith('float')
+    }
+
+    return col_names, dtype_map, converters
 
 
 GDELT2_TYPE_DESC_MAPPING = {

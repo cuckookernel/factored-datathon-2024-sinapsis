@@ -4,6 +4,8 @@ from datetime import timezone
 from pathlib import Path
 from typing import Literal, Optional
 
+
+NaN = float("nan")
 UTC = timezone.utc
 
 # Type Aliases
@@ -48,4 +50,3 @@ def gdelt_base_data_path(data_dir: Optional[str] = None) -> Path:
     """
     dat_path = data_path(data_dir)
     return dat_path / "GDELT"
-
