@@ -4,9 +4,8 @@ import os
 import re
 import zipfile
 from collections.abc import Callable, Generator, Mapping
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional, TypeAlias
+from typing import Literal, TypeAlias, Optional
 
 import numpy as np
 import pandas as pd
@@ -109,23 +108,21 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             if fpath.lstat().st_size == 0:
                 L.info(f"WARN: Skipping empty file: {fpath}")
                 continue
-            if typ == 'events':
-                interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
-                                          dtype=dtype_map, converters=converters)
-            else:
-                interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
-                                          dtype=dtype_map, header=1)
+            header=None if typ == 'events' else 1
+            interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
+                                      dtype=dtype_map, header=1, converters=converters)
 
         except zipfile.BadZipFile:
             L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
             continue
-        except ValueError as err:
+        except (ValueError, OverflowError) as err:
             if err.args[0].startswith('Zero files found'):
                 L.warning("Zero files found in fpath: %s, skipping", fpath)
                 continue
             else:
                 L.error(f"When reading: {fpath}\nerror msg: {err.args[0]}")
-                diagnose_problem(fpath, col_names, dtypes=dtype_map)
+                diagnose_problem(fpath, col_names)
+                find_faulty_row(fpath, col_names, dtype_map)
                 raise
         except Exception as exc:
             L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
@@ -152,7 +149,18 @@ def ensure_float(a_str: str) -> float:
             L.info("a_str=%s is not a float after cleanup", a_clean)
             return NaN
 
-def diagnose_problem(fpath: Path, col_names: list[str], dtypes: dict[str, dtype]) -> None:
+def try_into_int64(a_str: str) -> Optional[np.int64]:
+    """Convert to float attempting cleanup, return NaN if cleanup fails"""
+    if a_str == '':
+        return None
+
+    try:
+        return np.int64(a_str)
+    except OverflowError:
+        L.info("a_str='%s'  caused overflow, attempting cleanup", a_str)
+        return None
+
+def diagnose_problem(fpath: Path, col_names: list[str]) -> None:
     """Diagnose what might be wrong with raw csv file, called in case of failure"""
     n_cols = len(col_names)
     L.info(f"col_names has: {n_cols}: {col_names}")
@@ -164,15 +172,38 @@ def diagnose_problem(fpath: Path, col_names: list[str], dtypes: dict[str, dtype]
 
     if n_cols == n_cols_file:
         data_df = pd.read_csv(fpath, names=col_names, sep="\t")
-        print("row 1", data_df.iloc[1])
+        L.info("Num cols ok. Row 1:\n%s", data_df.iloc[1])
 
-        for col,dtyp in dtypes.items():
-            if dtyp == np.float64:
-                try:
-                    float_series = data_df[col].astype(np.float64)
-                    L.info("col: `%s` # ok values: %d", col, (~float_series.isna()).sum())
-                except ValueError as err:
-                    L.error("col: `%s`  error: %s", col, err.args[0])
+def find_faulty_row(fpath: Path, col_names: list[str], dtype_map: dict[str, dtype]):
+    raw_df = pd.read_csv(fpath, sep="\t")
+    print(f"raw_df: {raw_df.shape}")
+
+    start = 1
+    end = raw_df.shape[0]
+
+    # Run bisection to find problematic row
+    while (end - start) > 2:
+        mid = (start + end) // 2
+        try:
+            first_half = pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
+                                     header=start, nrows=mid-start)
+        except Exception as err:
+            end = mid
+            print(f"first_half faulty, new bracket  start: {start} end:{end} err: {err.args[0]}")
+            continue
+
+        try:
+            second_half = pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
+                                      header=mid, nrows=end-mid)
+        except Exception as err:
+            start = mid
+            print(f"first_half faulty, new bracket  start: {start} end:{end}  err: {err.args[0]}")
+
+    bad_part = pd.read_csv(fpath, sep="\t", names=col_names, header=start, nrows=end-start)
+
+    print("\n\nBad Rows:")
+    for _, row in bad_part.iterrows():
+        print(row)
 
 
 def interpret_fname(path: Path) -> tuple[str, str]:
@@ -216,6 +247,10 @@ def get_cols_and_types(schema_df: DataFrame,
         for col, pandas_type_desc in col_2_type_desc.items()
         if pandas_type_desc.startswith('float')
     }
+
+    if "reported_count" in col_names:
+        converters["reported_count"] = try_into_int64
+        del dtype_map["reported_count"]
 
     return col_names, dtype_map, converters
 

@@ -1,0 +1,43 @@
+column,col_renamed,data_type,description
+DATE,pub_date,INTEGER,"This is the date in YYYYMMDD format on which the news media used to construct this GKG file was published. NOTE that unlike the main GDELT event stream files, this date is the date of publication of the news media from which the information was extracted – if the article discusses events in the past, the date is NOT time-shifted as it is for the GDELT event stream. This date will be the same for all rows in a file and is redundant from a data processing"
+NUMARTS,num_articles,INTEGER,"This is the total number of source documents containing one or more mentions of this nameset. This can be used as a method of assessing the “importance” of a nameset: the more discussion of that nameset, the more likely it is to be significant. The total universe of source documents varies over time, so it is recommended that this field be normalized by the average or other measure of the universe of namesets during the time period of interest."
+COUNTS,counts,STRING,"(semicolon-delimited blocks, with pound symbol (`#`) delimited fields) This is the list of Counts found in this nameset. Each Count found is separated with a semicolon, while the fields within a Count are separated by the pound symbol (“#”). See the documentation for the GKG Count File files to see what each field captures. This captures all of the information found in the Count File and thus when using the GKG Graph file there is no need to separately download the Count File for the same day (the Count File is produced for those who only want to process counts and do not need all of the additional power of the full GKG Graph file)"
+THEMES,themes,STRING,"(semi-colon-delimited) This is the list of all Themes found in the nameset. For the complete list of possible themes, see the Category List spreadsheet. At the time of this writing there are over 150 themes currently recognized by the system."
+LOCATIONS,locations,STRING,"(semicolon-delimited blocks, with pound symbol (“#”) delimited fields) This is a list of all locations found in the text, extracted through the Leetaru (2012) algorithm. 5 The algorithm is run in a more aggressive stance here than ordinary in order to extract every possible locative referent, so may have a slightly elevated level of false positives."
+PERSONS,persons,STRING,"(semicolon-delimited) This is the list of all person names found in the text, extracted through the Leetaru (2012) algorithm. 6 This name recognition algorithm is unique in that it is specially designed to recognize the African, Asian, and Middle Eastern names that yield significantly reduced accuracy with most name recognition engines."
+ORGANIZATIONS,organizations,STRING,"(semicolon-delimited) This is the list of all company and organization names found in the text, extracted through the Leetaru (2012) algorithm. 7 This is a combination of corporations, IGOs, NGOs, and any other local organizations such as a local fair or council. This engine is highly adaptive and is currently tuned to err on the side of inclusion when it is less confident about a match to ensure maximal recall of smaller organizations around the world that are of especial interest to many users of the GKG. Conversely, certain smaller companies
+with names and contexts that do not provide a sufficient recognition latch may be missed or
+occasionally misclassified as a person name depending on context. It is highly recommended
+that users of the Persons and Organizations fields histogram the results and discard names
+appearing just once or twice to eliminate most of these false positive matches."
+TONE,tone_vec,STRING,"(comma-delimited floating point numbers) This field contains a comma-delimited list of
+six core emotional dimensions, described in more detail below. Each is recorded as a single
+precision floating point number.
+o Tone. This is the average “tone” of all documents containing one or more mentions of
+this nameset. The score ranges from -100 (extremely negative) to +100 (extremely
+positive). Common values range between -10 and +10, with 0 indicating neutral. This is
+calculated as Positive Score minus Negative Score. Note that both Positive Score and
+Negative Score are available separately below as well. A document with a Tone score
+close to zero may either have low emotional response or may have a Positive Score and
+Negative Score that are roughly equivalent to each other, such that they nullify each
+other. These situations can be detected either through looking directly at the Positive
+Score and Negative Score variables or through the Polarity variable.
+o Positive Score. This is the percentage of all words in the article that were found to have
+a positive emotional connotation. Ranges from 0 to +100.
+o Negative Score. This is the percentage of all words in the article that were found to
+have a negative emotional connotation. Ranges from 0 to +100.
+o Polarity. This is the percentage of words that had matches in the tonal dictionary as an
+indicator of how emotionally polarized or charged the text is. If Polarity is high, but
+Tone is neutral, this suggests the text was highly emotionally charged, but had roughly
+equivalent numbers of positively and negatively charged emotional words.
+o Activity Reference Density. This is the percentage of words that were active words
+offering a very basic proxy of the overall “activeness” of the text compared with a
+clinically descriptive text.
+o Self/Group Reference Density. This is the percentage of all words in the article that are
+pronouns, capturing a combination of self-references and group-based discourse. News
+media material tends to have very low densities of such language, but this can be used
+to distinguish certain classes of news media and certain contexts.
+"
+CAMEOEVENTIDS,event_ids,STRING,"This field contains a comma-separated list of GlobalEventIDs from the master GDELT event stream of events that were found in the same article(s) as this count was found. This can be used, for example, to associate any protest events from the primary GDELT event database with any “PROTEST” counts found in the same articles to compile a basic measure of how many protesters were involved with the protest. This is useful in that the GDELT event record for the protest encodes many other variables, such as the specific actors involved and their attributes, while the Count record only records that a certain number of protesters were mentioned in an article. The same GlobalEventID may appear in multiple entries if multiple counts were found in the same article mentioning that event or if that event was mentioned in multiple news articles with different counts (reflecting conflicting or evolving information on the details of the event)."
+SOURCES,sources,STRING,"This is a semicolon-delimited list of all of the sources publishing articles mentioning this count. For web-based news material, this is the top-level domain the page was from, while for BBC Monitoring service material, “BBC Monitoring” will appear. Thus, it is important to note that this field will contain a mixture of domain names and the phrase “BBC Monitoring”."
+SOURCEURLS,source_urls,STRING,"This is a delimited list of ALL articles mentioning this count. Since URLs can contain a wide variety of characters the phrase “<UDIV>” is used as the delimiter between articles. For web-based news material, this will be the complete URL to the article, while for BBC Monitoring service material, “BBC Monitoring” will appear. Thus, it is important to note that this field will contain a mixture of URLs and the phrase “BBC Monitoring”. It is alsoimportant to note that this field contains a list of ALL source articles, unlike the primary GDELT event stream, which only lists the first source article mentioning an event in the case an event is mentioned in multiple articles."
