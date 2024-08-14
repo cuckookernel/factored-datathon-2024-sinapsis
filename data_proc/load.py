@@ -180,13 +180,14 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     # %%
 
     col_names, dtype_map = get_cols_and_types(schema_df, column_name_mode)
+    L.info(f"col_names={col_names}")
 
     for fpath in raw_fpaths:
         try:
             if fpath.lstat().st_size == 0:
                 L.info(f"WARN: Skipping empty file: {fpath}")
                 continue
-            if typ != 'gkg':
+            if typ == 'events':
                 interval_df = pd.read_csv(fpath, sep='\t', names=col_names, dtype=dtype_map)
             else:
                 interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
@@ -200,7 +201,8 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
                 L.warning("Zero files found in fpath: %s, skipping", fpath)
                 continue
             else:
-                L.error(f"When reading: {fpath}")
+                L.error(f"When reading: {fpath}\nerror msg: {err.args[0]}")
+                diagnose_problem(fpath, col_names)
                 raise
         except Exception as exc:
             L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
@@ -210,6 +212,20 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             L.info(f'fname: {fpath.name} - {interval_df.shape[0]} records')
 
         yield interval_df, fpath
+
+
+def diagnose_problem(fpath: Path, col_names: list[str]):
+    n_cols = len(col_names)
+    L.info(f"col_names has: {n_cols}: {col_names}")
+    data_df = pd.read_csv(fpath, sep="\t")
+    n_cols_file = data_df.shape[1]
+    L.info(f"file has: {n_cols_file} columns")
+    first_row = data_df.iloc[0]
+    L.info(f"first row: {list(first_row)}")
+
+    if n_cols == n_cols_file:
+        data_df = pd.read_csv(fpath, names=col_names, sep="\t")
+        print(data_df.iloc[1])
 
 def interpret_fname(path: Path) -> tuple[str, str]:
     """Extract date_str and sample suffix from filename"""
@@ -252,7 +268,7 @@ GDELT2_TYPE_DESC_MAPPING = {
     "INTEGER": "int64",
     "STRING": "str",
     "HALF": "float16",
-    "FLOAT": "float32",
+    "FLOAT": "float64",
     "DOUBLE": "float64",
 }
 
