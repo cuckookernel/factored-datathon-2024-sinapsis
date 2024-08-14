@@ -4,7 +4,6 @@ from datetime import timezone
 from pathlib import Path
 from typing import Literal, Optional
 
-
 NaN = float("nan")
 UTC = timezone.utc
 

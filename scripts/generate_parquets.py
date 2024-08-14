@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Optional
 
 import click
-from pandas import DataFrame
 
 from data_proc.common import GdeltV1Type
-from data_proc.load import ParquetChunkGenerator
+from data_proc.load import df_iter_from_raw_files
+from data_proc.save_parquet import ParquetChunkGenerator
 
 
 @click.command()
@@ -35,42 +35,15 @@ def generate_parquets(file_type: GdeltV1Type,
     """
     src_path1 = src_path / 'raw_data'
 
-    pq_generator = ParquetChunkGenerator(typ=file_type, src_path=src_path)
+    raw_df_iter = df_iter_from_raw_files(file_type, src_path=src_path1)
+    pq_generator = ParquetChunkGenerator(typ=file_type, src_path=src_path1)
 
-    stats = pq_generator.save_parquet_chunks(rows_per_file=rows_per_file)
+    stats = pq_generator.save_parquet_chunks(rows_per_file=rows_per_file,
+                                             raw_df_iter=raw_df_iter,
+                                             limit=limit,
+                                             verbose=verbose)
 
     stats.log()
-
-
-
-def save_parquet(df: DataFrame, fnames: list[str], dst_path: Path,
-                  verbose: int = 0) -> None:
-    """Save a DataFrame to a Parquet file based on the provided filenames and destination path.
-
-    Args:
-    ----
-        df (DataFrame): The DataFrame to be saved.
-        fnames (list[str]): List of filenames to extract timestamps from.
-        dst_path (Path): Destination path to save the Parquet file.
-        verbose (int, optional): Verbosity level, default 0
-
-    Returns:
-    -------
-        None
-
-    """
-    tstamps = sorted([ fname.split('.')[0][2:-2] for fname in fnames ])
-    suffix = fnames[0].split('.')[1]
-    if not dst_path.exists():
-        print(f'save_parquet: creating path: {dst_path}')
-        dst_path.mkdir(exist_ok=True, parents=True)
-
-    parquet_fpath = dst_path / f"{tstamps[0]}-{tstamps[-1]}.{suffix}.parquet"
-    df.to_parquet(parquet_fpath)
-
-    if verbose > 0:
-        print(f'save_parquet: created file {parquet_fpath}, data shape: {df.shape}')
-
 
 
 if __name__ == "__main__":
