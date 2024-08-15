@@ -30,7 +30,6 @@ if [[ -z "$s3_directory" ]]; then
     scripts/upload-parquets-to-s3.sh $DATA_DIR/GDELT/last_1y_gkg        last_1y_gkg
     scripts/upload-parquets-to-s3.sh $DATA_DIR/GDELT/last_1y_gkgcounts  last_1y_gkgcounts
 
-
     INCREMENTAL MODEL:
       i.e. only adding files to S3 (use with caution as it might cause data duplication!
 
