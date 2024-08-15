@@ -2,14 +2,14 @@
 import os
 from datetime import timezone
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, TypeAlias
 
 NaN = float("nan")
 UTC = timezone.utc
 
 # Type Aliases
 GdeltV1Type = Literal["events", "gkg", "gkgcounts"]
-
+ColNameMode: TypeAlias = Literal["orig", "snake_case"]
 
 def data_path(data_dir: Optional[str] = None) -> Path:
     """Return a Path object representing the data directory.

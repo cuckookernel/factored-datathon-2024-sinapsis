@@ -1,23 +1,23 @@
 """Utilities to load data from disk into Dataframes  and set the schema on those"""
 # %%
 import os
-import re
 import zipfile
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Literal, Optional, TypeAlias
+from typing import Optional
 
-import numpy as np
 import pandas as pd
-from numpy import dtype
+from numpy import isnan
 from pandas import DataFrame
 
-from data_proc.common import GdeltV1Type, NaN, gdelt_base_data_path
+from data_proc.schema_helpers import get_cols_and_types, load_schema
+from data_proc.common import GdeltV1Type, ColNameMode, gdelt_base_data_path
+from data_proc.quality_helpers import find_faulty_row, diagnose_problem
+from data_proc.utils import try_to_int
 from shared import logging, runpyfile
 
 L = logging.getLogger("load")
 
-ColNameMode: TypeAlias = Literal["orig", "snake_case"]
 # %%
 
 def _interactive_run_load() -> None:
@@ -94,13 +94,19 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     raw_fpaths = sorted([fpath for pat in glob_patterns for fpath in src_path.glob(pat)])
     if len(raw_fpaths) == 0:
         err_msg = f"raw_paths is empty, src_path={src_path}, glob_patterns={glob_patterns}"
-        L.error("{}", err_msg)
+        L.error("%s", err_msg)
         raise RuntimeError(err_msg)
+
+    L.info(f"{len(raw_fpaths)} found - first={raw_fpaths[0]} - last={raw_fpaths[-1]}")
     # %%
 
     col_names, dtype_map, converters = get_cols_and_types(schema_df, column_name_mode)
 
-    L.info("col_names=%s, converters=%s", col_names, converters)
+    L.info("col_names=%s", col_names)
+    L.info("dtype_map=%s", dtype_map)
+    L.info("converters=%s", converters)
+
+    massaging_fun = MASSAGE_FUN_FOR_TYP.get(typ)
 
     for fpath in raw_fpaths:
         try:
@@ -110,6 +116,9 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             header=None if typ == 'events' else 1
             interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
                                       dtype=dtype_map, header=header, converters=converters)
+
+            if massaging_fun is not None:
+                interval_df = massaging_fun(interval_df)
 
         except zipfile.BadZipFile:
             L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
@@ -133,228 +142,48 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
         yield interval_df, fpath
 
 
-def ensure_float(a_str: str) -> float:
-    """Convert to float attempting cleanup, return NaN if cleanup fails"""
-    if a_str == '':
-        return NaN
-    try:
-        return float(a_str)
-    except ValueError:
-        L.info("a_str=%s is not a float, attempting cleanup", a_str)
-        a_clean = re.sub("[^0-9-.]", "", a_str)
-        try:
-            return float(a_clean)
-        except ValueError:
-            L.info("a_str=%s is not a float after cleanup", a_clean)
-            return NaN
+def massage_events(data_df: DataFrame) -> DataFrame:
+    """Massage the raw gkgcounts data
 
-def try_into_int64(a_str: str) -> Optional[np.int64]:
-    """Convert to float attempting cleanup, return NaN if cleanup fails"""
-    if a_str == '':
-        return None
-
-    try:
-        return np.int64(a_str)
-    except OverflowError:
-        L.info("a_str='%s'  caused overflow, attempting cleanup", a_str)
-        return None
-
-def diagnose_problem(fpath: Path, col_names: list[str]) -> None:
-    """Diagnose what might be wrong with raw csv file, called in case of failure"""
-    n_cols = len(col_names)
-    L.info(f"col_names has: {n_cols}: {col_names}")
-    data_df = pd.read_csv(fpath, sep="\t")
-    n_cols_file = data_df.shape[1]
-    L.info(f"file has: {n_cols_file} columns")
-    first_row = data_df.iloc[0]
-    L.info(f"first row: {list(first_row)}")
-
-    if n_cols == n_cols_file:
-        data_df = pd.read_csv(fpath, names=col_names, sep="\t")
-        L.info("Num cols ok. Row 1:\n%s", data_df.iloc[1])
-
-def find_faulty_row(fpath: Path, col_names: list[str], dtype_map: dict[str, dtype]) -> None:
-    """Apply bisection to identify faulty raw"""
-    raw_df = pd.read_csv(fpath, sep="\t")
-    print(f"raw_df: {raw_df.shape}")
-
-    start = 1
-    end = raw_df.shape[0]
-
-    # Run bisection to find problematic row
-    while (end - start) > 1:
-        mid = (start + end) // 2
-        try:
-            pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
-                         header=start, nrows=mid-start)
-        except (OverflowError, ValueError) as err:
-            end = mid
-            print(f"first_half faulty, new bracket  start: {start} end:{end} err: {err.args[0]}")
-            continue
-
-        try:
-            pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
-                        header=mid, nrows=end-mid)
-        except (OverflowError, ValueError) as err:
-            start = mid
-            print(f"first_half faulty, new bracket  start: {start} end:{end}  err: {err.args[0]}")
-
-    bad_part = pd.read_csv(fpath, sep="\t", names=col_names, header=start, nrows=end-start)
-
-    print("\n\nBad Rows:")
-    for _, row in bad_part.iterrows():
-        print(row)
-
-
-def interpret_fname(path: Path) -> tuple[str, str]:
-    """Extract date_str and sample suffix from filename"""
-    fname = path.name
-    date_str = fname.split('.')[0]
-    mch = re.search(r'(\.sampled_[0-9.]+)\.zip', fname)
-    if mch:
-        return date_str, mch.group(1)
-    else:
-        return date_str, ""
-
-def get_cols_and_types(schema_df: DataFrame,
-                       col_name_mode: ColNameMode,
-                       ) -> tuple[list[str], dict[str, dtype], dict[str, Callable]]:
-    """Extract column names and their corresponding data types from a schema DataFrame.
-
-    Args:
-    ----
-        schema_df (DataFrame): The DataFrame containing schema information.
-        col_name_mode (ColNameMode): A flag indicating whether to use original or
-            snake_case column names.
-
-    Returns:
-    -------
-        tuple[list[str], dict[str, type]]: A tuple containing a list of column names
-        and a dictionary mapping column names to their respective data types.
-
+    This function works only if we are doing column renaming.
+    It's not hard to make it more general, but wanted to delay that for now...
     """
-    col_names: list[str] = list(schema_df['snake_col_name']
-                                if col_name_mode == 'snake_case'
-                                else schema_df['column'])
 
-    col_2_type_desc: dict[str, str] = dict(zip(col_names, schema_df["pandas_type"], strict=True))
-    dtype_map = {col: TYPE_DESC_TO_NP_TYPE[pandas_type_desc]
-                 for col, pandas_type_desc in col_2_type_desc.items()
-                 if not pandas_type_desc.startswith('float')}
+    date_str = data_df["date_int"].astype(str)
+    data_df["pub_date"] = pd.to_datetime(date_str, format="%Y%m%d").dt.date
+    data_df["source_urls"] = data_df["source_urls"].str.split(";")
+    data_df["event_ids"] = data_df["event_ids"].apply(get_event_ids_array)
 
-    converters = {
-        col: ensure_float
-        for col, pandas_type_desc in col_2_type_desc.items()
-        if pandas_type_desc.startswith('float')
-    }
+    return data_df
 
-    if "reported_count" in col_names:
-        converters["reported_count"] = try_into_int64 # type: ignore [assignment]
-        del dtype_map["reported_count"]
+def massage_gkgcounts(data_df: DataFrame) -> DataFrame:
+    """Massage the raw gkgcounts data
 
-    return col_names, dtype_map, converters
+    This function works only if we are doing column renaming.
+    It's not hard to make it more general, but wanted to delay that for now...
+    """
+
+    pub_date_str = data_df["pub_date"].astype(str)
+    data_df["pub_date"] = pd.to_datetime(pub_date_str, format="%Y%m%d").dt.date
+    data_df["source_urls"] = data_df["source_urls"].str.split(";")
+    data_df["event_ids"] = data_df["event_ids"].apply(get_event_ids_array)
+
+    return data_df
 
 
-GDELT2_TYPE_DESC_MAPPING = {
-    "INTEGER": "int64",
-    "STRING": "str",
-    "HALF": "float16",
-    "FLOAT": "float64",
-    "DOUBLE": "float64",
+
+
+MASSAGE_FUN_FOR_TYP: dict[GdeltV1Type, Callable[[DataFrame],DataFrame]] = {
+    "gkgcounts": massage_gkgcounts
 }
 
+def get_event_ids_array(a_str: Optional[str]) -> Optional[list[int]]:
+    if a_str is None:
+        return None
 
-TYPE_DESC_TO_NP_TYPE: dict[str, dtype] = {
-    "int64": np.dtype('int64'),
-    "str": np.dtype(str),
-    "float16": np.dtype('float16'),
-    "float32": np.dtype('float32'),
-    "float64": np.dtype('float64'),
-}
-
-# %%
-def schema_path(typ: GdeltV1Type) -> Path:
-    """Return local schema path for a given GDELT file type"""
-    return Path(f"docs/schema_files/GDELT_v1.{typ}.columns.csv")
-
-
-def load_schema(typ: GdeltV1Type) -> DataFrame:
-    """Load the schema for GDELT 1.0 data based on the specified type.
-
-    Args:
-    ----
-        typ (Gdelt2FileType): The type of GDELT data to load the schema for.
-
-    Returns:
-    -------
-        DataFrame: The schema DataFrame with renamed columns and mapped data types.
-
-    """
-    # %%
-    local_path = schema_path(typ)
-    schema_df = pd.read_csv(local_path)
-    # %%
-
-    if 'col_renamed' in schema_df:
-        schema_df['snake_col_name'] = schema_df['col_renamed']
+    if isinstance(a_str, str):
+        return [try_to_int(piece, default=-1) for piece in a_str.split(",")]
+    elif isinstance(a_str, float) and isnan(a_str):
+        return None
     else:
-        col_renames = {
-            "GLOBALEVENTID": "ev_id",
-            "SQLDATE": "date_int",
-            "MONTH_YEAR": "date_int",
-            "DATEADDED": "date_added",
-            "SOURCEURL": "source_url",
-        }
-
-        schema_df['snake_col_name'] = (schema_df['column']
-            .apply(lambda col: rename_col(col, col_renames))
-        )
-
-    schema_df['pandas_type'] = (
-        schema_df['data_type'].apply(lambda data_type: GDELT2_TYPE_DESC_MAPPING[data_type])
-    )
-
-    return schema_df
-
-
-def rename_col(col: str, col_renames: Mapping[str, str]) -> str:
-    """Rename a column based on a mapping or convert it to snake_case if not found.
-
-    Args:
-    ----
-    col : str
-        The column name to be renamed.
-    col_renames : Mapping[str, str]
-        A mapping of original column names to new column names.
-
-    Returns:
-    -------
-    str
-        The renamed column name or the column name converted to snake_case if
-        not found in col_renames.
-
-    """
-    if col in col_renames:
-        return col_renames[col]
-    else:
-        return camel_to_snake_case(col)
-
-def camel_to_snake_case(identifier: str) -> str:
-    """Convert an identifier from camelCase to snake_case
-
-    Args:
-    ----
-    identifier (str): The identifier to transform
-
-    Examples:
-    --------
-        camel_to_snake_case("MonthYear") => "month_year"
-        camel_to_snake_case("ActionGeo_Lat") => "action_geo_lat"
-        camel_to_snake_case("Actor2Religion1Code") => "actor2_religion1_code"
-
-    """
-    step1 = re.sub(r'ID', 'Id', identifier)
-    step1b = re.sub(r'ADM', 'Adm', step1)
-    step2 = re.sub(r'(?<!^)(?=[A-Z])', '_', step1b).lower()
-
-    return re.sub(r'_{2,}', '_', step2)
+        raise TypeError(f"Invalid type found: {type(a_str)} value: `{repr(a_str)}`")

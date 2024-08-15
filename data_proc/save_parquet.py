@@ -8,7 +8,8 @@ import pandas as pd
 from pandas import DataFrame
 
 from data_proc.common import GdeltV1Type
-from data_proc.load import interpret_fname
+from data_proc.utils import interpret_fname
+
 from shared import logging
 
 L = logging.getLogger("save_pq")
