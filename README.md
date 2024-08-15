@@ -66,6 +66,7 @@ On Linux/Mac, create a file called `profile.env`, directly under your home/user 
 # EXAMPLE contents of file
 export DATA_DIR='/home/teo/data'   # GDELT data files will be stored here
 export PYTHONPATH='./'  # So that python can resolve imports such as `from data_proc....`
+export S3_PREFIX='s3://databricks-workspace-stack-41100-bucket/unity-catalog/2578366185261862'
 ```
 
 On Windows, define these variables directly using the Windows system app for that...
