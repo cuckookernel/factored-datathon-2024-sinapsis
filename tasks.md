@@ -5,11 +5,14 @@ Teo:
 
 - [X] parse gkgcounts.event_ids as list of int
 - [X] parse gkgcounts.source_urls as list of strings
-- [ ] Parse gkgcounts as float
+- [X] Parse gkgcounts.number as float
 
-- [ ] Parse date_added as proper timestamp
-- [ ] Parse gkgcounts.pub_date as proper date
-- [ ] Download cameo codes from url and map codes in file to them.
- 
+- [X] Parse date_added as proper timestamp
+- [X] Parse gkgcounts.pub_date as proper date
+
+- [ ] Put cameo codes on s3 in a more std csv format
+- [ ] Create view of events, crossing with cameo codes
+- [ ] massager for gkg file
+
 - [X] Get Schema files for v1
 - [X] Adapt `scripts/README.md` for version 1.0

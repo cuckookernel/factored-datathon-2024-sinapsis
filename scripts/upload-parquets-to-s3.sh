@@ -50,4 +50,4 @@ fi
 
 aws s3 cp --recursive $local_directory/raw_parquet/  $S3_PREFIX/$s3_directory
 
-aws s3 ls $S3_PREFIX/$s3_directory
+aws s3 ls $S3_PREFIX/$s3_directory/

@@ -1,13 +1,22 @@
+from dataclasses import dataclass
+
 from numpy import dtype
 from shared import np, pd, DataFrame, Path, Callable
 
 from data_proc.common import GdeltV1Type, ColNameMode
-from data_proc.utils import ensure_float, try_into_int64, rename_col
+from data_proc.utils import ensure_float, rename_col
+
+
+@dataclass
+class SchemaTraits:
+    col_names: list[str]
+    dtype_map: dict[str, dtype]
+    converters: dict[str, Callable]
+
 
 
 def get_cols_and_types(schema_df: DataFrame,
-                       col_name_mode: ColNameMode,
-                       ) -> tuple[list[str], dict[str, dtype], dict[str, Callable]]:
+                       col_name_mode: ColNameMode) -> SchemaTraits:
     """Extract column names and their corresponding data types from a schema DataFrame.
 
     Args:
@@ -37,7 +46,7 @@ def get_cols_and_types(schema_df: DataFrame,
         if pandas_type_desc.startswith('float')
     }
 
-    return col_names, dtype_map, converters
+    return SchemaTraits(col_names, dtype_map, converters)
 
 
 GDELT2_TYPE_DESC_MAPPING = {

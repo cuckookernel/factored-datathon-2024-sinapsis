@@ -10,9 +10,9 @@ import pandas as pd
 from numpy import isnan
 from pandas import DataFrame
 
-from data_proc.schema_helpers import get_cols_and_types, load_schema
-from data_proc.common import GdeltV1Type, ColNameMode, gdelt_base_data_path
-from data_proc.quality_helpers import find_faulty_row, diagnose_problem
+from data_proc.common import ColNameMode, GdeltV1Type, gdelt_base_data_path
+from data_proc.quality_helpers import diagnose_problem, find_faulty_row
+from data_proc.schema_helpers import SchemaTraits, get_cols_and_types, load_schema
 from data_proc.utils import try_to_int
 from shared import logging, runpyfile
 
@@ -59,7 +59,6 @@ def _interactive_run_load() -> None:
 
         if cnt > 0:
             print(f"{col}: {cnt}")
-    # %%
 
 
 def df_iter_from_raw_files(typ: GdeltV1Type,
@@ -100,46 +99,64 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     L.info(f"{len(raw_fpaths)} found - first={raw_fpaths[0]} - last={raw_fpaths[-1]}")
     # %%
 
-    col_names, dtype_map, converters = get_cols_and_types(schema_df, column_name_mode)
+    schema_traits = get_cols_and_types(schema_df, column_name_mode)
 
-    L.info("col_names=%s", col_names)
-    L.info("dtype_map=%s", dtype_map)
-    L.info("converters=%s", converters)
+    L.info("col_names=%s", schema_traits.col_names)
+    L.info("dtype_map=%s", schema_traits.dtype_map)
+    L.info("converters=%s", schema_traits.converters)
 
     massaging_fun = MASSAGE_FUN_FOR_TYP.get(typ)
-
     for fpath in raw_fpaths:
-        try:
-            if fpath.lstat().st_size == 0:
-                L.info(f"WARN: Skipping empty file: {fpath}")
-                continue
-            header=None if typ == 'events' else 1
-            interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
-                                      dtype=dtype_map, header=header, converters=converters)
 
-            if massaging_fun is not None:
-                interval_df = massaging_fun(interval_df)
+        interval_df = proc_one(fpath, typ, schema_traits, massaging_fun)
 
-        except zipfile.BadZipFile:
-            L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
+        if interval_df is None:
             continue
-        except (ValueError, OverflowError) as err:
-            if err.args[0].startswith('Zero files found'):
-                L.warning("Zero files found in fpath: %s, skipping", fpath)
-                continue
-            else:
-                L.error(f"When reading: {fpath}\nerror msg: {err.args[0]}")
-                diagnose_problem(fpath, col_names)
-                find_faulty_row(fpath, col_names, dtype_map)
-                raise
-        except Exception as exc:
-            L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
-            raise
 
         if verbose > 1:
             L.info(f'fname: {fpath.name} - {interval_df.shape[0]} records')
 
         yield interval_df, fpath
+
+
+def proc_one(fpath: Path, typ: GdeltV1Type,
+             schema_traits: SchemaTraits,
+             massaging_fun: Callable[[DataFrame], DataFrame] | None,
+             ) -> Optional[DataFrame]:
+    """Load and massage one raw csv file"""
+    try:
+        if fpath.lstat().st_size == 0:
+            L.info(f"WARN: Skipping empty file: {fpath}")
+            return None
+
+        header = None if typ == 'events' else 1
+        interval_df = pd.read_csv(fpath, sep='\t',
+                                  header=header,
+                                  names=schema_traits.col_names,
+                                  dtype=schema_traits.dtype_map,
+                                  converters=schema_traits.converters)
+        if massaging_fun is not None:
+            interval_df = massaging_fun(interval_df)
+
+    except zipfile.BadZipFile:
+        L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
+        return None
+
+    except (ValueError, OverflowError) as err:
+        if err.args[0].startswith('Zero files found'):
+            L.warning("Zero files found in fpath: %s, skipping", fpath)
+            return None
+        else:
+            L.error(f"When reading: {fpath}\nerror msg: {err.args[0]}")
+            diagnose_problem(fpath, schema_traits.col_names)
+            find_faulty_row(fpath, schema_traits.col_names, schema_traits.dtype_map)
+            raise
+
+    except Exception as exc:
+        L.error("Exception reading parquet from path: %s\n%s", fpath, exc.args)
+        raise
+
+    return interval_df
 
 
 def massage_events(data_df: DataFrame) -> DataFrame:
@@ -148,11 +165,9 @@ def massage_events(data_df: DataFrame) -> DataFrame:
     This function works only if we are doing column renaming.
     It's not hard to make it more general, but wanted to delay that for now...
     """
-
-    date_str = data_df["date_int"].astype(str)
-    data_df["pub_date"] = pd.to_datetime(date_str, format="%Y%m%d").dt.date
-    data_df["source_urls"] = data_df["source_urls"].str.split(";")
-    data_df["event_ids"] = data_df["event_ids"].apply(get_event_ids_array)
+    ev_date_str = data_df["ev_date"].astype(str)
+    data_df["ev_date"] = pd.to_datetime(ev_date_str, format="%Y%m%d").dt.date
+    data_df["date_added"] = pd.to_datetime(data_df["date_added"], format="%Y%m%d").dt.date
 
     return data_df
 
@@ -162,22 +177,17 @@ def massage_gkgcounts(data_df: DataFrame) -> DataFrame:
     This function works only if we are doing column renaming.
     It's not hard to make it more general, but wanted to delay that for now...
     """
-
     pub_date_str = data_df["pub_date"].astype(str)
     data_df["pub_date"] = pd.to_datetime(pub_date_str, format="%Y%m%d").dt.date
-    data_df["source_urls"] = data_df["source_urls"].str.split(";")
+    data_df["sources"] = data_df["sources"].str.split(";")
+    data_df["source_urls"] = data_df["source_urls"].str.split("<UDIV>")
     data_df["event_ids"] = data_df["event_ids"].apply(get_event_ids_array)
 
     return data_df
 
 
-
-
-MASSAGE_FUN_FOR_TYP: dict[GdeltV1Type, Callable[[DataFrame],DataFrame]] = {
-    "gkgcounts": massage_gkgcounts
-}
-
 def get_event_ids_array(a_str: Optional[str]) -> Optional[list[int]]:
+    """Parse event list as list of ints"""
     if a_str is None:
         return None
 
@@ -186,4 +196,10 @@ def get_event_ids_array(a_str: Optional[str]) -> Optional[list[int]]:
     elif isinstance(a_str, float) and isnan(a_str):
         return None
     else:
-        raise TypeError(f"Invalid type found: {type(a_str)} value: `{repr(a_str)}`")
+        raise TypeError(f"Invalid type found: {type(a_str)} value: `{a_str!r}`")
+
+
+MASSAGE_FUN_FOR_TYP: dict[GdeltV1Type, Callable[[DataFrame],DataFrame]] = {
+    "events": massage_events,
+    "gkgcounts": massage_gkgcounts,
+}
