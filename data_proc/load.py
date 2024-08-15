@@ -249,7 +249,7 @@ def get_cols_and_types(schema_df: DataFrame,
     }
 
     if "reported_count" in col_names:
-        converters["reported_count"] = try_into_int64  # type: ignore
+        converters["reported_count"] = try_into_int64 # type: ignore [assignment]
         del dtype_map["reported_count"]
 
     return col_names, dtype_map, converters

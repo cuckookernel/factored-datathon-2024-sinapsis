@@ -49,3 +49,9 @@ def gdelt_base_data_path(data_dir: Optional[str] = None) -> Path:
     """
     dat_path = data_path(data_dir)
     return dat_path / "GDELT"
+
+# %%
+def suffix_for_typ(typ: GdeltV1Type) -> str:
+    """Return the suffix used in files for a given type"""
+    return "export" if typ == "events" else typ
+# %%
