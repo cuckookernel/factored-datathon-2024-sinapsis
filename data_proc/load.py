@@ -5,7 +5,7 @@ import re
 import zipfile
 from collections.abc import Callable, Generator, Mapping
 from pathlib import Path
-from typing import Literal, TypeAlias, Optional
+from typing import Literal, Optional, TypeAlias
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ from numpy import dtype
 from pandas import DataFrame
 
 from data_proc.common import GdeltV1Type, NaN, gdelt_base_data_path
-from shared import logging
+from shared import logging, runpyfile
 
 L = logging.getLogger("load")
 
@@ -22,8 +22,7 @@ ColNameMode: TypeAlias = Literal["orig", "snake_case"]
 
 def _interactive_run_load() -> None:
     # %%
-    # noinspection PyUnresolvedReferences
-    runfile("data_proc/load.py") # noqa: F821
+    runpyfile("data_proc/load.py")
     # %%
     import sys
 
@@ -110,7 +109,7 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
                 continue
             header=None if typ == 'events' else 1
             interval_df = pd.read_csv(fpath, sep='\t', names=col_names,
-                                      dtype=dtype_map, header=1, converters=converters)
+                                      dtype=dtype_map, header=header, converters=converters)
 
         except zipfile.BadZipFile:
             L.info(f"BadZipFile exception for {fpath} (size={fpath.lstat().st_size})")
@@ -174,7 +173,8 @@ def diagnose_problem(fpath: Path, col_names: list[str]) -> None:
         data_df = pd.read_csv(fpath, names=col_names, sep="\t")
         L.info("Num cols ok. Row 1:\n%s", data_df.iloc[1])
 
-def find_faulty_row(fpath: Path, col_names: list[str], dtype_map: dict[str, dtype]):
+def find_faulty_row(fpath: Path, col_names: list[str], dtype_map: dict[str, dtype]) -> None:
+    """Apply bisection to identify faulty raw"""
     raw_df = pd.read_csv(fpath, sep="\t")
     print(f"raw_df: {raw_df.shape}")
 
@@ -182,20 +182,20 @@ def find_faulty_row(fpath: Path, col_names: list[str], dtype_map: dict[str, dtyp
     end = raw_df.shape[0]
 
     # Run bisection to find problematic row
-    while (end - start) > 2:
+    while (end - start) > 1:
         mid = (start + end) // 2
         try:
-            first_half = pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
-                                     header=start, nrows=mid-start)
-        except Exception as err:
+            pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
+                         header=start, nrows=mid-start)
+        except (OverflowError, ValueError) as err:
             end = mid
             print(f"first_half faulty, new bracket  start: {start} end:{end} err: {err.args[0]}")
             continue
 
         try:
-            second_half = pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
-                                      header=mid, nrows=end-mid)
-        except Exception as err:
+            pd.read_csv(fpath, sep="\t", names=col_names, dtype=dtype_map,
+                        header=mid, nrows=end-mid)
+        except (OverflowError, ValueError) as err:
             start = mid
             print(f"first_half faulty, new bracket  start: {start} end:{end}  err: {err.args[0]}")
 
@@ -249,7 +249,7 @@ def get_cols_and_types(schema_df: DataFrame,
     }
 
     if "reported_count" in col_names:
-        converters["reported_count"] = try_into_int64
+        converters["reported_count"] = try_into_int64  # type: ignore
         del dtype_map["reported_count"]
 
     return col_names, dtype_map, converters

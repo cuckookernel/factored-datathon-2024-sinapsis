@@ -78,6 +78,7 @@ class ParquetChunkGenerator:
 
             if chunk_row_cnt > rows_per_file or (limit is not None and i >= limit):
                 self._save_1_parquet_chunk(sampled_suffix, verbose)
+                chunk_row_cnt = 0
 
             if limit is not None and i >= limit:
                 break

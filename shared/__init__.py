@@ -22,3 +22,9 @@ def read_env() -> None:
     DO NOT USE in prod!
     """
     load_dotenv(f"{os.environ['HOME']}/profile.env")
+
+
+def runpyfile(path: str) -> None:
+    """Run python file interactively using the associated IPython(?) function..."""
+    # noinspection PyUnresolvedReferences
+    runfile(path)  # type: ignore # noqa: F821

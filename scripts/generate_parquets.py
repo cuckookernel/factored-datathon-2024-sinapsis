@@ -42,7 +42,6 @@ def generate_parquets(file_type: GdeltV1Type,
                                              raw_df_iter=raw_df_iter,
                                              limit=limit,
                                              verbose=verbose)
-
     stats.log()
 
 

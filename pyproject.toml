@@ -1,0 +1,4 @@
+[[tool.mypy.overrides]]
+module = "traitlets"
+ignore_errors = true
+
