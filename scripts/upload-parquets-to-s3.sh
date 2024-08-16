@@ -11,6 +11,8 @@ has_param() {
     return 1
 }
 
+set -xe
+
 local_directory="$1"
 shift
 s3_directory="$1"

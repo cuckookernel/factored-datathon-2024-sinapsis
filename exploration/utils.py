@@ -2,7 +2,7 @@
 from ydata_profiling import ProfileReport
 
 from data_proc.common import GdeltV1Type, gdelt_base_data_path, suffix_for_typ
-from shared import DataFrame, Path, date, logging, np, pd, re, runpyfile
+from shared import DataFrame, Path, date, logging, np, pd, re, runpyfile, Series
 
 L = logging.getLogger("x-util")
 # %%
@@ -108,3 +108,41 @@ def extract_dates(a_str: str) -> list[date]:
 
     return ret
 # %%
+
+def plot_null_pcts(data_df: DataFrame):
+    n_rows = data_df.shape[0]
+    null_pcts = pd.DataFrame(data_df.isnull().sum() / n_rows * 100).reset_index()
+    null_pcts.columns = ['column', 'pct_nulls']
+    null_pcts.sort_values('pct_nulls', inplace=True, ascending=False)
+
+    ax = null_pcts.plot(y="pct_nulls", kind="barh", figsize=(3, 15))
+    ax.set_yticklabels(null_pcts["column"])
+
+    return null_pcts, ax
+
+
+def top_frequent(series: Series, top: int | None = None, total_pct: float | None = None):
+    total_n = len(series)
+    val_pct_series = (series.fillna('__NULL__')
+                      .value_counts(dropna=False).sort_values(ascending=False) / total_n) * 100
+
+    val_pct = pd.DataFrame(val_pct_series).reset_index()
+    n_unique = val_pct.shape[0]
+    val_pct.columns = ['value', 'pct']
+
+    val_pct['cum_pct'] = val_pct['pct'].cumsum()
+
+    if total_pct is not None:
+        cut = np.where(val_pct['cum_pct'] >= total_pct)
+        idx = cut[0][0]
+    elif top is not None:
+        idx = min(top, n_unique) - 1
+    else:
+        raise ValueError("Need to provide either top or total_pct argument")
+
+    other_vals_label = f"*OTHER* ({n_unique - idx - 1} distinct values)"
+    other_vals_pct = val_pct['pct'].iloc[idx + 1:].sum()
+
+    last_row = pd.DataFrame([[other_vals_label, other_vals_pct]], columns=['value', 'pct'])
+
+    return pd.concat([val_pct.iloc[:idx + 1][['value', 'pct']], last_row])

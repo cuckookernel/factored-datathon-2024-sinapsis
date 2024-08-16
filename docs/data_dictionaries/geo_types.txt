@@ -1,0 +1,6 @@
+GEO_TYPE,DESCRIPTION
+1,Country
+2,U.S. State
+3,U.S. City
+4,World City
+5,World State

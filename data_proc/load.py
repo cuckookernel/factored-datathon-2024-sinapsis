@@ -1,16 +1,17 @@
 """Utilities to load data from disk into Dataframes  and set the schema on those"""
 # %%
+import csv
 import os
 import zipfile
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeAlias, TypeVar
 
 import pandas as pd
 from numpy import isnan
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
-from data_proc.common import ColNameMode, GdeltV1Type, gdelt_base_data_path
+from data_proc.common import ColNameMode, GdeltV1Type, gdelt_base_data_path, suffix_for_typ, NaN
 from data_proc.quality_helpers import diagnose_problem, find_faulty_row
 from data_proc.schema_helpers import SchemaTraits, get_cols_and_types, load_schema
 from data_proc.utils import try_to_int
@@ -86,18 +87,9 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
     """
     # %%
     schema_df = load_schema(typ)
-    suffix = "export" if typ == "events" else typ
-
-    glob_patterns = [f'*.{suffix}.CSV.zip', f'*.{suffix}.csv.zip',
-                     f'*.{suffix}.CSV.sampled_*.*.zip', f'*.{suffix}.csv.sampled_*.*.zip']
-    raw_fpaths = sorted([fpath for pat in glob_patterns for fpath in src_path.glob(pat)])
-    if len(raw_fpaths) == 0:
-        err_msg = f"raw_paths is empty, src_path={src_path}, glob_patterns={glob_patterns}"
-        L.error("%s", err_msg)
-        raise RuntimeError(err_msg)
+    raw_fpaths = get_fpaths(src_path, typ)
 
     L.info(f"{len(raw_fpaths)} found - first={raw_fpaths[0]} - last={raw_fpaths[-1]}")
-    # %%
 
     schema_traits = get_cols_and_types(schema_df, column_name_mode)
 
@@ -117,6 +109,21 @@ def df_iter_from_raw_files(typ: GdeltV1Type,
             L.info(f'fname: {fpath.name} - {interval_df.shape[0]} records')
 
         yield interval_df, fpath
+
+
+def get_fpaths(src_path: Path, typ: GdeltV1Type) -> list[Path]:
+    """Get ull raw data paths for a given typ under a src_path"""
+    suffix = suffix_for_typ(typ)
+
+    glob_patterns = [f'*.{suffix}.CSV.zip', f'*.{suffix}.csv.zip',
+                     f'*.{suffix}.CSV.sampled_*.*.zip', f'*.{suffix}.csv.sampled_*.*.zip']
+    raw_fpaths = sorted([fpath for pat in glob_patterns for fpath in src_path.glob(pat)])
+    if len(raw_fpaths) == 0:
+        err_msg = f"raw_paths is empty, src_path={src_path}, glob_patterns={glob_patterns}"
+        L.error("%s", err_msg)
+        raise RuntimeError(err_msg)
+
+    return raw_fpaths
 
 
 def proc_one(fpath: Path, typ: GdeltV1Type,
@@ -185,7 +192,6 @@ def massage_gkgcounts(data_df: DataFrame) -> DataFrame:
 
     return data_df
 
-
 def get_event_ids_array(a_str: Optional[str]) -> Optional[list[int]]:
     """Parse event list as list of ints"""
     if a_str is None:
@@ -196,10 +202,113 @@ def get_event_ids_array(a_str: Optional[str]) -> Optional[list[int]]:
     elif isinstance(a_str, float) and isnan(a_str):
         return None
     else:
-        raise TypeError(f"Invalid type found: {type(a_str)} value: `{a_str!r}`")
+        raise TypeError(f"Invalid type found for event_ids: {type(a_str)} value: `{a_str!r}`")
 
+
+def massage_gkg(data_df: DataFrame) -> DataFrame:
+    """Massage the raw gkg data
+
+    This function works only if we are doing column renaming.
+    It's not hard to make it more general, but wanted to delay that for now...
+    """
+    # %%
+    ret: dict[str, Series] = {}
+
+    pub_date_str = data_df["pub_date"].astype(str)
+    ret["pub_date"] = pd.to_datetime(pub_date_str, format="%Y%m%d").dt.date
+
+    ret["num_articles"] = data_df["num_articles"]
+
+    ret['counts'] = data_df['counts'].apply(
+        lambda a_str: parse_string_to_list(a_str, ';', parse_count))
+
+    for col in ["themes", "persons", "organizations"]:
+        ret[col] = data_df[col].str.split(";")
+
+    ret['locations'] = data_df['locations'].apply(
+        lambda a_str: parse_string_to_list(a_str, ';', parse_count))
+
+    tone_vecs = data_df["tone"].apply(lambda a_str: parse_string_to_list(a_str, ',', float))
+    for i, sub_key in enumerate(TONE_SUB_KEYS):
+        ret[f'tone_{sub_key}'] = tone_vecs.str[i]
+
+    ret["event_ids"] = data_df["event_ids"].apply(get_event_ids_array)
+    ret["sources"] = data_df["sources"].str.split(";")
+    ret["source_urls"] = data_df["source_urls"].str.split("<UDIV>")
+
+    for col in data_df.columns:
+        if col not in ret:
+            ret[col] = data_df[col]
+
+    del ret['tone']
+    # %%
+
+    return DataFrame(ret)
+
+# %%
+TONE_SUB_KEYS = ["avg", "pct_pos", "pct_neg", "polarity", "pct_active", "pct_self_ref"]
+
+_T = TypeVar("_T")
+CountRecord: TypeAlias = dict[str, str|float|int]
+LocRecord: TypeAlias = dict[str, str|float|int]
+
+
+def parse_string_to_list(a_str: str, sep: str,
+                         parse_fun: Callable[[str], _T]) -> list[_T] | None:
+    if a_str is None:
+        return None
+
+    if isinstance(a_str, str):
+        try:
+            return [parse_fun(one_str) for one_str in a_str.split(sep) if one_str != '']
+        except ValueError:
+            present_str = "\n - " + "\n - ".join(a_str.split())
+            print(f"ERROR: {err}\n{present_str}")
+
+    elif isinstance(a_str, float) and isnan(a_str):
+        return None
+    else:
+        raise TypeError(f"Invalid type found for tone: {type(a_str)} value: `{a_str!r}`")
+
+
+def parse_count(one_str: str) -> CountRecord:
+    """One piece extracted from counts column into an actual "counts record". """
+    tup = one_str.split('#')
+    assert len(tup) == 10, f"len of tup is : {len(tup)}: {tup}"
+
+    try:
+        return {"cnt_t": tup[0],
+            "num": float(tup[1]),
+            "obj_t": tup[2],
+            "g_t": tup[3],
+            "g_fn": tup[4],
+            "g_ctry": tup[5],
+            "g_adm": tup[6],
+            "g_lat": float(tup[7]) if tup[7] != '' else NaN,
+            "g_lon": float(tup[8]) if tup[8] != '' else NaN,
+            "g_fid": tup[9]}
+    except ValueError as err:
+        print(f"ERROR: {err} \nReason: tup was: {list(enumerate(tup))}")
+        raise
+
+def parse_location(one_str: str) -> LocRecord:
+    """One piece extracted from counts column into an actual "counts record". """
+    tup = one_str.split('#')
+    assert len(tup) >= 7, f"len of tup is : {len(tup)}: {tup}"
+    if len(tup) != 7:
+        L.info(f"Location tuple is too long, expected 7, but got n_elems={len(tup)}: {tup}")
+
+    return {"g_t": tup[0],
+            "g_fn": tup[1],
+            "g_ctry": tup[2],
+            "g_adm": tup[3],
+            "g_lat": float(tup[4]) if tup[4] != '' else NaN,
+            "g_lon": float(tup[5]) if tup[5] != '' else NaN,
+            "g_fid": tup[6]}
+# %%
 
 MASSAGE_FUN_FOR_TYP: dict[GdeltV1Type, Callable[[DataFrame],DataFrame]] = {
     "events": massage_events,
     "gkgcounts": massage_gkgcounts,
+    "gkg": massage_gkg,
 }

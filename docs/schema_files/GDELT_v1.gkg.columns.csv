@@ -10,7 +10,7 @@ with names and contexts that do not provide a sufficient recognition latch may b
 occasionally misclassified as a person name depending on context. It is highly recommended
 that users of the Persons and Organizations fields histogram the results and discard names
 appearing just once or twice to eliminate most of these false positive matches."
-TONE,tone_vec,STRING,"(comma-delimited floating point numbers) This field contains a comma-delimited list of
+TONE,tone,STRING,"(comma-delimited floating point numbers) This field contains a comma-delimited list of
 six core emotional dimensions, described in more detail below. Each is recorded as a single
 precision floating point number.
 o Tone. This is the average “tone” of all documents containing one or more mentions of
