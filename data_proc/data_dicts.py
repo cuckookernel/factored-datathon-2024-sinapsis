@@ -1,10 +1,8 @@
 import csv
-import logging
 from pathlib import Path
 
 import pandas as pd
-
-from shared import logger
+from shared import logging
 from data_proc.common import gdelt_base_data_path
 
 L = logging.getLogger("d_dict")

@@ -226,7 +226,7 @@ def massage_gkg(data_df: DataFrame) -> DataFrame:
         ret[col] = data_df[col].str.split(";")
 
     ret['locations'] = data_df['locations'].apply(
-        lambda a_str: parse_string_to_list(a_str, ';', parse_count))
+        lambda a_str: parse_string_to_list(a_str, ';', parse_location))
 
     tone_vecs = data_df["tone"].apply(lambda a_str: parse_string_to_list(a_str, ',', float))
     for i, sub_key in enumerate(TONE_SUB_KEYS):
@@ -249,8 +249,8 @@ def massage_gkg(data_df: DataFrame) -> DataFrame:
 TONE_SUB_KEYS = ["avg", "pct_pos", "pct_neg", "polarity", "pct_active", "pct_self_ref"]
 
 _T = TypeVar("_T")
-CountRecord: TypeAlias = dict[str, str|float|int]
-LocRecord: TypeAlias = dict[str, str|float|int]
+CountRecord: TypeAlias = dict[str, str|float|int|None]
+LocRecord: TypeAlias = dict[str, str|float|int|None]
 
 
 def parse_string_to_list(a_str: str, sep: str,
@@ -261,7 +261,7 @@ def parse_string_to_list(a_str: str, sep: str,
     if isinstance(a_str, str):
         try:
             return [parse_fun(one_str) for one_str in a_str.split(sep) if one_str != '']
-        except ValueError:
+        except ValueError as err:
             present_str = "\n - " + "\n - ".join(a_str.split())
             print(f"ERROR: {err}\n{present_str}")
 
@@ -279,32 +279,37 @@ def parse_count(one_str: str) -> CountRecord:
     try:
         return {"cnt_t": tup[0],
             "num": float(tup[1]),
-            "obj_t": tup[2],
-            "g_t": tup[3],
-            "g_fn": tup[4],
-            "g_ctry": tup[5],
-            "g_adm": tup[6],
+            "obj_t": tup[2] or None,  # object type
+            "g_t": int(tup[3]), # geo type
+            "g_fn": tup[4] or None, # Full Name
+            "g_ctry": tup[5] or None, # geo country code
+            "g_adm": tup[6], # geo admin code
             "g_lat": float(tup[7]) if tup[7] != '' else NaN,
             "g_lon": float(tup[8]) if tup[8] != '' else NaN,
-            "g_fid": tup[9]}
+            "g_fid": tup[9], # geo feature id
+        }
     except ValueError as err:
         print(f"ERROR: {err} \nReason: tup was: {list(enumerate(tup))}")
         raise
 
+BAD_GEO_TUPS_SEEN: set[tuple[str, ...]] = set()
+
 def parse_location(one_str: str) -> LocRecord:
     """One piece extracted from counts column into an actual "counts record". """
-    tup = one_str.split('#')
+    tup = tuple(one_str.split('#'))
     assert len(tup) >= 7, f"len of tup is : {len(tup)}: {tup}"
-    if len(tup) != 7:
+    if len(tup) != 7 and tup not in BAD_GEO_TUPS_SEEN:
+        BAD_GEO_TUPS_SEEN.add(tup)
         L.info(f"Location tuple is too long, expected 7, but got n_elems={len(tup)}: {tup}")
 
-    return {"g_t": tup[0],
-            "g_fn": tup[1],
-            "g_ctry": tup[2],
-            "g_adm": tup[3],
+    return {"g_t": int(tup[0]),  # geo type
+            "g_fn": tup[1] or None, # geo full name
+            "g_ctry": tup[2] or None, # geo country code
+            "g_adm": tup[3] or None,  # geo adm code
             "g_lat": float(tup[4]) if tup[4] != '' else NaN,
             "g_lon": float(tup[5]) if tup[5] != '' else NaN,
-            "g_fid": tup[6]}
+            "g_fid": tup[6] or None # geo feature id
+            }
 # %%
 
 MASSAGE_FUN_FOR_TYP: dict[GdeltV1Type, Callable[[DataFrame],DataFrame]] = {
