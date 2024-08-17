@@ -1,6 +1,5 @@
 """Utilities to load data from disk into Dataframes  and set the schema on those"""
 # %%
-import csv
 import os
 import zipfile
 from collections.abc import Callable, Generator

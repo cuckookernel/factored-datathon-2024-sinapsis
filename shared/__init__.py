@@ -8,7 +8,7 @@ import re  # noqa: F401
 from collections.abc import Callable, Mapping  # noqa: F401
 from datetime import date, time, timedelta  # noqa: F401
 from pathlib import Path  # noqa: F401
-from typing import Optional  # noqa: F401
+from typing import Optional, Any, TypeVar  # noqa: F401
 
 import numpy as np  # noqa: F401
 import pandas as pd  # noqa: F401
@@ -28,6 +28,7 @@ logger = logging.getLogger("rich")
 
 logger.info("rich logger initialized")
 
+T_ = TypeVar("T_")
 
 def read_env() -> None:
     """Only use when testing code interactively on the console
@@ -41,3 +42,9 @@ def runpyfile(path: str) -> None:
     """Run python file interactively using the associated IPython(?) function..."""
     # noinspection PyUnresolvedReferences
     runfile(path)  # noqa: F821  # type: ignore [name-defined]
+
+
+def assert_type(val: Any, typ_: type[T_]) -> T_:
+    """Assert type of something"""
+    assert isinstance(val, typ_), f"Expected type: {typ_}, found: `{type(val)}`, val={val!r}"
+    return val

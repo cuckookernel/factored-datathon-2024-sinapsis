@@ -1,10 +1,10 @@
 from collections import Counter
-from pandas import DataFrame, Series
+from pandas import Series
 
 import data_proc.load as ld
-from data_proc.common import GdeltV1Type, gdelt_base_data_path, ColNameMode
-from data_proc.load import MASSAGE_FUN_FOR_TYP
-from data_proc.schema_helpers import load_schema, get_cols_and_types
+from test.utils import _read_one_type
+
+
 # %%
 
 def _interactive_testing():
@@ -48,15 +48,13 @@ def test_proc_gkg() -> None:
     # %%
     data_df = _read_one_type("gkg", do_massage=True)
 
-    type_cnts = get_type_cnts(interval_df['pub_date'])
+    type_cnts = get_type_cnts(data_df['pub_date'])
     assert set(type_cnts.keys()) == {"date"}
     # %%
 
 def get_type_cnts(series: Series) -> dict[str, int]:
     """Return a dictionary of the forma {"type_name": cnt} for all distinct types in Series"""
     return series.apply(lambda v: type(v).__name__).value_counts().to_dict()
-
-
 
 
 def test_proc_one_gkgcounts() -> None:
@@ -75,22 +73,3 @@ def test_proc_one_gkgcounts() -> None:
     interval_df['event_ids'].apply(one_update)
 
     assert set(cntr.keys()).issubset(['None', 'int'])  # noqa: S101
-
-# %%
-
-def _read_one_type(typ: GdeltV1Type, do_massage: bool = True) -> DataFrame:
-    # %%
-    src_path = gdelt_base_data_path() / f'last_1y_{typ}' / 'raw_data'
-    fpath = next(iter(src_path.glob("*.zip")))
-
-    schema_df = load_schema(typ=typ)
-    column_name_mode: ColNameMode = "snake_case"
-    massaging_fun = MASSAGE_FUN_FOR_TYP.get(typ) if do_massage else None
-
-    schema_traits = get_cols_and_types(schema_df, column_name_mode)
-
-    data_df = ld.proc_one(fpath, typ, schema_traits, massaging_fun)
-    # %%
-    assert isinstance(data_df, DataFrame)  # noqa: S101 # this is a test; assert is ok
-
-    return data_df
