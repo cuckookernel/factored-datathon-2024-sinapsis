@@ -1,8 +1,9 @@
 """Utiltities for data exploration"""
-from ydata_profiling import ProfileReport
+from matplotlib.axis import Axis
+from ydata_profiling import ProfileReport  # type: ignore [import-untyped]
 
 from data_proc.common import GdeltV1Type, gdelt_base_data_path, suffix_for_typ
-from shared import DataFrame, Path, date, logging, np, pd, re, runpyfile, Series
+from shared import DataFrame, Path, Series, date, logging, np, pd, re, runpyfile
 
 L = logging.getLogger("x-util")
 # %%
@@ -109,11 +110,12 @@ def extract_dates(a_str: str) -> list[date]:
     return ret
 # %%
 
-def plot_null_pcts(data_df: DataFrame):
+def plot_null_pcts(data_df: DataFrame) -> tuple[DataFrame, Axis]:
+    """Return data frame and bar plot of pct of nulls for each column"""
     n_rows = data_df.shape[0]
-    null_pcts = pd.DataFrame(data_df.isnull().sum() / n_rows * 100).reset_index()
-    null_pcts.columns = ['column', 'pct_nulls']
-    null_pcts.sort_values('pct_nulls', inplace=True, ascending=False)
+    null_pcts = pd.DataFrame(data_df.isna().sum() / n_rows * 100).reset_index()
+    null_pcts.columns = ['column', 'pct_nulls'] # type: ignore [assignment]
+    null_pcts = null_pcts.sort_values('pct_nulls', ascending=False)  # type: ignore [assignment]
 
     ax = null_pcts.plot(y="pct_nulls", kind="barh", figsize=(3, 15))
     ax.set_yticklabels(null_pcts["column"])
@@ -121,14 +123,16 @@ def plot_null_pcts(data_df: DataFrame):
     return null_pcts, ax
 
 
-def top_frequent(series: Series, top: int | None = None, total_pct: float | None = None):
+def top_frequent(series: Series, top: int | None = None,
+                 total_pct: float | None = None) -> DataFrame:
+    """Return top most frequent, limiting by number or by total relative frequency"""
     total_n = len(series)
     val_pct_series = (series.fillna('__NULL__')
                       .value_counts(dropna=False).sort_values(ascending=False) / total_n) * 100
 
     val_pct = pd.DataFrame(val_pct_series).reset_index()
     n_unique = val_pct.shape[0]
-    val_pct.columns = ['value', 'pct']
+    val_pct.columns = ['value', 'pct'] # type: ignore [assignment]
 
     val_pct['cum_pct'] = val_pct['pct'].cumsum()
 

@@ -1,3 +1,4 @@
+"""Diagnosing quality problems in raw data"""
 import logging
 from pathlib import Path
 

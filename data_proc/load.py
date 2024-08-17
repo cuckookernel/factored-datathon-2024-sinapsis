@@ -10,7 +10,7 @@ import pandas as pd
 from numpy import isnan
 from pandas import DataFrame, Series
 
-from data_proc.common import ColNameMode, GdeltV1Type, gdelt_base_data_path, suffix_for_typ, NaN
+from data_proc.common import ColNameMode, GdeltV1Type, NaN, gdelt_base_data_path, suffix_for_typ
 from data_proc.quality_helpers import diagnose_problem, find_faulty_row
 from data_proc.schema_helpers import SchemaTraits, get_cols_and_types, load_schema
 from data_proc.utils import try_to_int
@@ -53,7 +53,12 @@ def _interactive_run_load() -> None:
     # %%
     # save_parquet_chunks(typ, rows_per_chunk, src_path / 'raw_data', limit=100,
     #                    verbose=1)
+
+    path = gdelt_base_data_path() / "20240805-20240813.gkgcounts.parquet"
+    gkgc = pd.read_parquet(path)
+    print(gkgc.shape)
     # %%
+
     for col in one_df.columns:
         cnt = (one_df[col] == 'GOV').sum()
 
@@ -254,6 +259,7 @@ LocRecord: TypeAlias = dict[str, str|float|int|None]
 
 def parse_string_to_list(a_str: str, sep: str,
                          parse_fun: Callable[[str], _T]) -> list[_T] | None:
+    """Parse a string into a list of the type returned by parse_fun"""
     if a_str is None:
         return None
 
@@ -263,17 +269,19 @@ def parse_string_to_list(a_str: str, sep: str,
         except ValueError as err:
             present_str = "\n - " + "\n - ".join(a_str.split())
             print(f"ERROR: {err}\n{present_str}")
+            raise
 
     elif isinstance(a_str, float) and isnan(a_str):
         return None
     else:
         raise TypeError(f"Invalid type found for tone: {type(a_str)} value: `{a_str!r}`")
 
+EXPECTED_COUNT_TUP_SIZE = 7
 
 def parse_count(one_str: str) -> CountRecord:
-    """One piece extracted from counts column into an actual "counts record". """
+    """One piece extracted from counts column into an actual "counts record"."""
     tup = one_str.split('#')
-    assert len(tup) == 10, f"len of tup is : {len(tup)}: {tup}"
+    assert len(tup) == EXPECTED_COUNT_TUP_SIZE, f"len of tup is : {len(tup)}: {tup}" # noqa: S101
 
     try:
         return {"cnt_t": tup[0],
@@ -293,11 +301,13 @@ def parse_count(one_str: str) -> CountRecord:
 
 BAD_GEO_TUPS_SEEN: set[tuple[str, ...]] = set()
 
+EXPECTED_GEO_TUP_SIZE = 7
+
 def parse_location(one_str: str) -> LocRecord:
-    """One piece extracted from counts column into an actual "counts record". """
+    """One piece extracted from counts column into an actual "counts record"."""
     tup = tuple(one_str.split('#'))
-    assert len(tup) >= 7, f"len of tup is : {len(tup)}: {tup}"
-    if len(tup) != 7 and tup not in BAD_GEO_TUPS_SEEN:
+    assert len(tup) >= EXPECTED_GEO_TUP_SIZE, f"len of tup is : {len(tup)}: {tup}" # noqa: S101
+    if len(tup) != EXPECTED_GEO_TUP_SIZE and tup not in BAD_GEO_TUPS_SEEN:
         BAD_GEO_TUPS_SEEN.add(tup)
         L.info(f"Location tuple is too long, expected 7, but got n_elems={len(tup)}: {tup}")
 
@@ -307,7 +317,7 @@ def parse_location(one_str: str) -> LocRecord:
             "g_adm": tup[3] or None,  # geo adm code
             "g_lat": float(tup[4]) if tup[4] != '' else NaN,
             "g_lon": float(tup[5]) if tup[5] != '' else NaN,
-            "g_fid": tup[6] or None # geo feature id
+            "g_fid": tup[6] or None, # geo feature id
             }
 # %%
 

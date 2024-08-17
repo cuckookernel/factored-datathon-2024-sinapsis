@@ -1,9 +1,10 @@
+"""Testing utilities"""
 from pandas import DataFrame
 
 from data_proc import load as ld
-from data_proc.common import GdeltV1Type, gdelt_base_data_path, ColNameMode
+from data_proc.common import ColNameMode, GdeltV1Type, gdelt_base_data_path
 from data_proc.load import MASSAGE_FUN_FOR_TYP
-from data_proc.schema_helpers import load_schema, get_cols_and_types
+from data_proc.schema_helpers import get_cols_and_types, load_schema
 
 
 def read_one_type(typ: GdeltV1Type, do_massage: bool = True) -> DataFrame:
@@ -20,6 +21,6 @@ def read_one_type(typ: GdeltV1Type, do_massage: bool = True) -> DataFrame:
 
     data_df = ld.proc_one(fpath, typ, schema_traits, massaging_fun)
     # %%
-    assert isinstance(data_df, DataFrame)  # noqa: S101 # this is a test; assert is ok
+    assert isinstance(data_df, DataFrame)
 
     return data_df

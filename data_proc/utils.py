@@ -1,8 +1,8 @@
 """Utilties for data processing"""
-from typing import Mapping
+from collections.abc import Mapping
 
-from shared import Optional, np, logging, re, Path
 from data_proc.common import NaN
+from shared import Optional, Path, logging, np, re
 
 L = logging.getLogger("dp-util")
 # %%
@@ -92,7 +92,8 @@ def camel_to_snake_case(identifier: str) -> str:
     return re.sub(r'_{2,}', '_', step2)
 
 
-def try_to_int(a: str, default=1):
+def try_to_int(a: str, default: int = 1) -> int:
+    """Try converting `a` to int. On failure return `default`"""
     try:
         return int(a)
     except ValueError:

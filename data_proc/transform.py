@@ -1,12 +1,13 @@
-
-from shared import logging
-from shared import DataFrame, Series
+"""Data transformations"""
 from data_proc.data_dicts import load_all_data_dicts
+from shared import DataFrame, Series, logging
 
 L = logging.getLogger("transf")
 
 class CodeDescEnricher:
-    def __init__(self):
+    """Adding of description columns derived from code columns"""
+
+    def __init__(self) -> None:
         self.data_dicts: dict[str, Series] = load_all_data_dicts()
 
     def enrich_ip(self, some_df: DataFrame,
@@ -14,7 +15,6 @@ class CodeDescEnricher:
                   data_dict_key: str,
                   tgt_desc_col: str | None = None) -> None:
         """Add a description column in place"""
-
         data_dict: Series = self.data_dicts[data_dict_key]
 
         if tgt_desc_col is None:
@@ -34,19 +34,3 @@ class CodeDescEnricher:
         # print(f"joined_df: {joined_df.shape}, {joined_df.columns}")
         desc_col = joined_df.iloc[:, 1]
         some_df[tgt_desc_col] = desc_col
-
-
-def test_transform_events(events_df):
-    # %%
-    runfile("data_proc/transform.py")
-    enricher = CodeDescEnricher()
-    # %%
-    data_dict = enricher.data_dicts["cameo_actor_type"]
-    # %%
-    enricher.enrich_ip(events_df, "a1_type1_code", "cameo_actor_type")
-    # %%
-    enricher.enrich_ip(events_df, "ev_code", "cameo_event")
-    enricher.enrich_ip(events_df, "ev_base_code", "cameo_event")
-    enricher.enrich_ip(events_df, "ev_root_code", "cameo_event")
-    enricher.enrich_ip(events_df, "quad_class", "quad_classes")
-    # %%

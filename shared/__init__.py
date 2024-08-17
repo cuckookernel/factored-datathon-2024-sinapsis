@@ -8,7 +8,7 @@ import re  # noqa: F401
 from collections.abc import Callable, Mapping  # noqa: F401
 from datetime import date, time, timedelta  # noqa: F401
 from pathlib import Path  # noqa: F401
-from typing import Optional, Any, TypeVar  # noqa: F401
+from typing import Any, Optional, TypeVar  # noqa: F401
 
 import numpy as np  # noqa: F401
 import pandas as pd  # noqa: F401
@@ -44,7 +44,7 @@ def runpyfile(path: str) -> None:
     runfile(path)  # noqa: F821  # type: ignore [name-defined]
 
 
-def assert_type(val: Any, typ_: type[T_]) -> T_:
+def assert_type(val: object, typ_: type[T_]) -> T_:
     """Assert type of something"""
-    assert isinstance(val, typ_), f"Expected type: {typ_}, found: `{type(val)}`, val={val!r}"
+    assert isinstance(val, typ_), f"Expected type: {typ_}, found: `{type(val)}`, val={val!r}" # noqa: S101
     return val

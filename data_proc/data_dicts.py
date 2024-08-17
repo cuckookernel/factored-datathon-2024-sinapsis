@@ -1,3 +1,4 @@
+"""Data dict standardization etc.."""
 import csv
 from dataclasses import dataclass
 from pathlib import Path
@@ -5,20 +6,23 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from pandas import Series
-from shared import logging, assert_type
+
 from data_proc.common import gdelt_base_data_path
+from shared import assert_type, logging
 
 L = logging.getLogger("d_dict")
 
 
 @dataclass
 class Spec:
+    """params for data dictionary loading"""
+
     url: str
     cols_renamed: list[str]
     cols: list[str] | None = None
+    types: list[str] | None = None
     amend: str | None = None
     amend_types: list[str] | None = None
-    types: list[str] | None = None
     sep: str | None = None
 
 
@@ -26,8 +30,8 @@ CONFIG : dict[str, Spec] = {
     "quad_classes": Spec(
         url="docs/data_dictionaries/GDELT.quadclasses.txt",
         cols=["QUADCLASS", "DESCRIPTION"],
-        sep=",",
         types=["int", "str"],
+        sep=",",
         cols_renamed=["quad_class", "ev_desc"],
     ),
     "cameo_event": Spec(
@@ -58,7 +62,7 @@ CONFIG : dict[str, Spec] = {
         cols=["GEO_TYPE", "DESCRIPTION"],
         cols_renamed=["geo_type", "geo_type_desc"],
         types=["int", "str"],
-    )
+    ),
 }
 # %%
 
@@ -68,7 +72,7 @@ def load_all_data_dicts() -> dict[str, Series]:
     name will range over names
     """
     ret: dict[str, Series] = {}
-    for name in CONFIG.keys():
+    for name in CONFIG:
         pq_fpath = gdelt_base_data_path() / f"{name}/{name}.parquet"
         if not pq_fpath.exists():
             L.info("dictionary file not found, running dictionaries_standardization!")
@@ -88,7 +92,7 @@ def load_all_data_dicts() -> dict[str, Series]:
     return ret
 # %%
 
-def dictionaries_standardization(names: list[str] | None = None):
+def dictionaries_standardization(names: list[str] | None = None) -> None:
     """Transform CAMEO event codes.txt to a more standard csv and parquet"""
     for name, spec in CONFIG.items():
         if names is not None and name not in names:
@@ -99,7 +103,7 @@ def dictionaries_standardization(names: list[str] | None = None):
         header = 0 if cols is not None else None
         types = spec.types or ["str"] * 2
 
-        dtype_map = dict(zip(spec.cols_renamed, types))
+        dtype_map = dict(zip(spec.cols_renamed, types, strict=False))
 
         L.info(f"Loading dictionary - {name}, from: {spec.url}")
         L.info(f"header={header} sep={sep!r} dtype_map={dtype_map}")
@@ -108,17 +112,19 @@ def dictionaries_standardization(names: list[str] | None = None):
             # just check columns first
             tmp_df = pd.read_csv(spec.url, sep=sep, header=header, nrows=1)
             df_cols = list(tmp_df.columns)
-            assert df_cols == cols, f"df_cols={df_cols}, expected: {cols}"
+            if df_cols != cols:
+                raise ValueError(f"df_cols={df_cols}, expected: {cols}")
 
         dict_df = pd.read_csv(spec.url, sep=sep, names=spec.cols_renamed,
                               dtype=dtype_map, header=header)
 
         if spec.amend:
             amend_types = assert_type(spec.amend_types, list)
-            dtype_map = dict(zip(spec.cols_renamed, amend_types))
+            dtype_map = dict(zip(spec.cols_renamed, amend_types, strict=True))
             amend_df = pd.read_csv(spec.amend, sep=",", quoting=csv.QUOTE_ALL,
                                    dtype=dtype_map)
-            assert np.all(amend_df.columns == dict_df.columns)
+            if not np.all(amend_df.columns == dict_df.columns):
+                raise ValueError("Amend is bad...")
             dict_df = pd.concat([dict_df, amend_df])
 
         # remove repetitions in codes...

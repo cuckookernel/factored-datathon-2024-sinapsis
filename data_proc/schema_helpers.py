@@ -1,14 +1,17 @@
+"""Dealing with raw data schemas"""
 from dataclasses import dataclass
 
 from numpy import dtype
-from shared import np, pd, DataFrame, Path, Callable
 
-from data_proc.common import GdeltV1Type, ColNameMode
+from data_proc.common import ColNameMode, GdeltV1Type
 from data_proc.utils import ensure_float, rename_col
+from shared import Callable, DataFrame, Path, np, pd
 
 
 @dataclass
 class SchemaTraits:
+    """Column names, types, converters"""
+
     col_names: list[str]
     dtype_map: dict[str, dtype]
     converters: dict[str, Callable]
