@@ -34,3 +34,20 @@ class CodeDescEnricher:
         # print(f"joined_df: {joined_df.shape}, {joined_df.columns}")
         desc_col = joined_df.iloc[:, 1]
         some_df[tgt_desc_col] = desc_col
+
+
+def enrich_events_ip(enricher: CodeDescEnricher, events_df: DataFrame) -> None:
+    # %%
+    enricher.enrich_ip(events_df, "quad_class", "quad_classes")
+    enricher.enrich_ip(events_df, "ev_code", "cameo_event")
+    enricher.enrich_ip(events_df, "ev_base_code", "cameo_event")
+    enricher.enrich_ip(events_df, "ev_root_code", "cameo_event")
+    # %%
+    enricher.enrich_ip(events_df, "a1_type1_code", "cameo_actor_type")
+    enricher.enrich_ip(events_df, "a1_country_code", "cameo_country")
+
+    enricher.enrich_ip(events_df, "a2_type1_code", "cameo_actor_type")
+    enricher.enrich_ip(events_df, "a2_country_code", "cameo_country")
+
+    enricher.enrich_ip(events_df, "act_country_code", "fips_country")
+    # %%

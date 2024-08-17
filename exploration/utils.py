@@ -117,7 +117,7 @@ def plot_null_pcts(data_df: DataFrame) -> tuple[DataFrame, Axis]:
     null_pcts.columns = ['column', 'pct_nulls'] # type: ignore [assignment]
     null_pcts = null_pcts.sort_values('pct_nulls', ascending=False)  # type: ignore [assignment]
 
-    ax = null_pcts.plot(y="pct_nulls", kind="barh", figsize=(3, 15))
+    ax = null_pcts.plot(y="pct_nulls", kind="barh", figsize=(5, 0.20 * len(null_pcts)))
     ax.set_yticklabels(null_pcts["column"])
 
     return null_pcts, ax
@@ -150,3 +150,23 @@ def top_frequent(series: Series, top: int | None = None,
     last_row = pd.DataFrame([[other_vals_label, other_vals_pct]], columns=['value', 'pct'])
 
     return pd.concat([val_pct.iloc[:idx + 1][['value', 'pct']], last_row])
+
+
+def plot_top_frequent(series: Series, top: int):
+    top_df = top_frequent(series, top=top)
+    top_df1 = top_df.iloc[:-1].sort_values('pct', ascending=True)
+
+    other_mask = top_df['value'].str.contains('*OTHER*', regex=False)
+    other_row = top_df.loc[other_mask].iloc[0]
+
+    ax = top_df1.plot(y="pct", kind="barh",
+                      figsize=(5, 0.20 * len(top_df)),
+                      xlabel='% frequency',
+                      title=f'Frequent values for: {series.name}' )
+    ax.tick_params(top=True, labeltop=True, bottom=False, labelbottom=False)
+    ax.set_yticklabels(top_df1["value"])
+
+    print(f'{other_row["value"]} : {other_row["pct"]:.2f} %')
+    return ax
+
+# %%
