@@ -13,10 +13,10 @@ import zipfile
 import io
 # instead of export PYTHONPATH='./'
 sys.path.append("/Workspace/Repos/rojas.f.adrian@gmail.com/factored-datathon-2024-sinapsis")
-from data_proc.widget_helper import set_up_date_range_widgets, get_date_range, set_up_source_widgets, get_source
+from data_proc.widget_helper import *
 from data_proc.delta_tables_helper import DeltaTableHelper
 from data_proc.common import GdeltV1Type
-from data_proc.download import download_files, raw_files_list, download_file_catalog, BASE_URL, download_one
+from data_proc.download import download_files, raw_files_list, download_file_catalog, BASE_URL, download_one, download_and_extract_csv
 from data_proc.load import load_schema
 from shared import logging
 
@@ -28,13 +28,16 @@ csv.field_size_limit(sys.maxsize)
 # get widget values
 set_up_date_range_widgets(spark)
 set_up_source_widgets(spark)
+set_up_force_sync_widgets(spark)
 
 start_date, end_date = get_date_range(spark)
 start_date_str, end_date_str = start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
 source = get_source(spark)
 
-start_date, end_date, source
+force_ingestion = get_force_sync(spark)
+
+start_date, end_date, source, force_ingestion
 
 # COMMAND ----------
 
@@ -74,8 +77,7 @@ checkpoint_df = (spark.table("gdelt.bronze_scraping_checkpoints")
                  .filter((F.col("event_type") == source )
                      & (F.to_date("date_str", "yyyyMMdd").between(start_date, end_date))))
 
-# TODO: add widget to force re-ingestion of all files
-force_ingestion = False
+
 if force_ingestion:
     files_to_ingest = filtered_files
     new_files = filtered_files.join(checkpoint_df, ["date_str", "event_type"], "left_anti")
@@ -86,20 +88,6 @@ else:
 print(f"Found {new_files.count()} new files to ingest.")
 
 # COMMAND ----------
-
-def download_and_extract_csv(url):
-    response = download_one(url)
-    if response.status_code == 200:
-        with zipfile.ZipFile(io.BytesIO(response.content)) as the_zip:
-            # Assuming the CSV file is the first file in the ZIP archive
-            for file_info in the_zip.infolist():
-                if file_info.filename.lower().endswith('.csv'):
-                    with the_zip.open(file_info.filename) as csv_file:
-                        csv_content = csv_file.read().decode('utf-8')
-                        return csv_content
-    else:
-        print(f"Failed to download {url} with status code {response.status_code}")
-        return None
 
 def csv_to_spark_df(csv_content, schema: StructType, header=True, delimiter='\t'):
     # Create a list of Rows from the CSV content

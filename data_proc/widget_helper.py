@@ -36,7 +36,15 @@ def get_source(spark):
     source = dbutils.widgets.get("source")
     return source
 
+def set_up_force_sync_widgets(spark):
+    dbutils = DBUtils(spark)
+    dbutils.widgets.text("force_sync", "", "force_sync")
 
+def get_force_sync(spark):
+    dbutils = DBUtils(spark)
+    force_sync = dbutils.widgets.get("force_sync")
+    # default to false if not provided or not valid string
+    return force_sync == "true"
 
 
 
