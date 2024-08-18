@@ -311,7 +311,7 @@ def download_one(url: str,
 def download_and_extract_csv(url):
     response = download_one(url)
     if response.status_code == 200:
-        with zipfile.ZipFile(io.BytesIO(response.content)) as the_zip:
+        with zipfile.ZipFile(BytesIO(response.content)) as the_zip:
             # Assuming the CSV file is the first file in the ZIP archive
             for file_info in the_zip.infolist():
                 if file_info.filename.lower().endswith('.csv'):
