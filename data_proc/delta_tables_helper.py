@@ -1,4 +1,4 @@
-from pyspark.sql.types import DateType, FloatType, IntegerType, StringType, StructField, StructType
+from pyspark.sql.types import DateType, FloatType, IntegerType, StringType, StructField, StructType,ArrayType
 
 
 class DeltaTableHelper:
@@ -11,7 +11,7 @@ class DeltaTableHelper:
                 StructField("count_type", StringType(), True),
                 StructField("reported_count", FloatType(), True),
                 StructField("object_type", StringType(), True),
-                StructField("geo_type", IntegerType(), True),
+                StructField("geo_id", IntegerType(), True),
                 StructField("geo_full_name", StringType(), True),
                 StructField("geo_country_code", StringType(), True),
                 StructField("geo_adm1_code", StringType(), True),
@@ -169,3 +169,27 @@ class DeltaTableHelper:
                     StructField("source_url", StringType(), nullable=True),
                 ]
             )
+        class GKGCounts:
+            table_name = "gdelt.silver_gkgcounts"
+            partition = "pub_date"
+            schema = StructType(
+            [
+                StructField("pub_date", DateType(), True),
+                StructField("num_articles", IntegerType(), True),
+                StructField("count_type", StringType(), True),
+                StructField("reported_count", FloatType(), True),
+                StructField("object_type", StringType(), True),
+                StructField("geo_id", IntegerType(), True),
+                StructField("geo_type", StringType(), True),
+                StructField("geo_country", StringType(), True),
+                StructField("geo_state", StringType(), True),
+                StructField("geo_location", StringType(), True),
+                StructField("geo_lat", FloatType(), True),
+                StructField("geo_lon", FloatType(), True),
+                StructField("event_ids", ArrayType(IntegerType()), True),
+                StructField("sources", ArrayType(StringType()), True),
+                StructField("source_urls", ArrayType(StringType()), True),
+            ]
+        )
+
+
