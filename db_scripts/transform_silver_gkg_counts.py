@@ -102,4 +102,9 @@ transformed_df = transformed_df.select(
 
 # COMMAND ----------
 
-transformed_df.write.mode("append").partitionBy(silver_gkg_counts.partition).saveAsTable(silver_gkg_counts.table_name)
+# Overwrite the silver table with the new data to avoid duplicates if we reprocessed the data
+(transformed_df
+    .write.mode("overwrite")
+    .option("replaceWhere", f"{silver_gkg_counts.partition} >= '{start_date_str}' AND {silver_gkg_counts.partition} <= '{end_date_str}'")
+    .partitionBy(silver_gkg_counts.partition)
+    .saveAsTable(silver_gkg_counts.table_name))
