@@ -11,7 +11,7 @@ class DeltaTableHelper:
                 StructField("count_type", StringType(), True),
                 StructField("reported_count", FloatType(), True),
                 StructField("object_type", StringType(), True),
-                StructField("geo_type", IntegerType(), True),
+                StructField("geo_id", IntegerType(), True),
                 StructField("geo_full_name", StringType(), True),
                 StructField("geo_country_code", StringType(), True),
                 StructField("geo_adm1_code", StringType(), True),
