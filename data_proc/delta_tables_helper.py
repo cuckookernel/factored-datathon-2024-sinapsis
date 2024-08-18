@@ -1,5 +1,5 @@
-from pyspark.sql.types import DateType, FloatType, IntegerType, StringType, StructField, StructType
-
+from pyspark.sql.types import DateType, FloatType, IntegerType, StringType, StructField, StructType, ArrayType
+from pyspark.sql.functions import udf
 
 class DeltaTableHelper:
     class BronzeTables:
@@ -169,3 +169,151 @@ class DeltaTableHelper:
                     StructField("source_url", StringType(), nullable=True),
                 ]
             )
+        
+        class GKG:
+            table_name = "gdelt.silver_gkg"
+            partition = "pub_date"
+            schema = StructType([
+                    StructField("pub_date", IntegerType(), True),
+                    StructField("num_articles", IntegerType(), True),
+                    StructField("counts", ArrayType(
+                        StructType([
+                            StructField("Type", StringType(), True),
+                            StructField("Count", IntegerType(), True),
+                            StructField("ObjectType", StringType(), True),
+                            StructField("LocationType", StringType(), True),
+                            StructField("LocationName", StringType(), True),
+                            StructField("CountryCode", StringType(), True),
+                            StructField("ADM1Code", StringType(), True),
+                            StructField("Latitude", FloatType(), True),
+                            StructField("Longitude", FloatType(), True),
+                            StructField("LocationFeatureID", StringType(), True)
+                        ])
+                    ), True),
+                    StructField("themes", ArrayType(StringType(), True), True),
+                    StructField("locations", ArrayType(
+                        StructType([
+                            StructField("LocationType", StringType(), True),
+                            StructField("LocationName", StringType(), True),
+                            StructField("CountryCode", StringType(), True),
+                            StructField("ADM1Code", StringType(), True),
+                            StructField("Latitude", FloatType(), True),
+                            StructField("Longitude", FloatType(), True),
+                            StructField("LocationFeatureID", StringType(), True)
+                        ])
+                    ), True),
+                    StructField("persons", ArrayType(StringType(), True), True),
+                    StructField("organizations", ArrayType(StringType(), True), True),
+                    StructField("tone_vec", StructType([
+                        StructField("Tone", FloatType(), True),
+                        StructField("PositiveScore", FloatType(), True),
+                        StructField("NegativeScore", FloatType(), True),
+                        StructField("Polarity", FloatType(), True),
+                        StructField("ActRefDensity", FloatType(), True),
+                        StructField("SelfGroupRefDensity", FloatType(), True)
+                    ]), True),
+                    StructField("event_ids", ArrayType(StringType(), True), True),
+                    StructField("sources", ArrayType(StringType(), True), True),
+                    StructField("source_urls", ArrayType(StringType(), True), True)
+                ])
+            
+            def parse_gkg_count_entry(count_entry):
+                locationTypeMap = {"1": "COUNTRY", "2": "USSTATE", "3":"USCITY", "4":"WORLDCITY", "5":"WORLDSTATE"}
+                parsed_entries = []
+                if count_entry:
+                    entries = count_entry.split(';')
+                    for entry in entries:
+                        if entry:
+                            parts = entry.split('#')
+                            parsed_entry = {
+                                "Type": parts[0],
+                                "Count": int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None,
+                                "ObjectType": parts[2] if len(parts) > 2 else None,
+                                "LocationType": locationTypeMap.get(parts[3], parts[3]) if len(parts) > 3 and parts[3] else None,
+                                "LocationName": parts[4] if len(parts) > 4 else None,
+                                "CountryCode": parts[5] if len(parts) > 5 else None,
+                                "ADM1Code": parts[6] if len(parts) > 6 else None,
+                                "Latitude": float(parts[7]) if len(parts) > 7 and parts[7] else None,
+                                "Longitude": float(parts[8]) if len(parts) > 8 and parts[8] else None,
+                                "LocationFeatureID": parts[9] if len(parts) > 9 else None
+                            }
+                            parsed_entries.append(parsed_entry)
+                
+                # Return None if no entries were found
+                return parsed_entries if len(parsed_entries) > 0 else None
+
+            gkg_counts_schema = ArrayType(StructType([
+                StructField("Type", StringType(), True),
+                StructField("Count", IntegerType(), True),
+                StructField("ObjectType", StringType(), True),
+                StructField("LocationType", StringType(), True),
+                StructField("LocationName", StringType(), True),
+                StructField("CountryCode", StringType(), True),
+                StructField("ADM1Code", StringType(), True),
+                StructField("Latitude", FloatType(), True),
+                StructField("Longitude", FloatType(), True),
+                StructField("LocationFeatureID", StringType(), True)
+            ]))
+
+            parse_gkg_count_entry_udf = udf(parse_gkg_count_entry, gkg_counts_schema)
+
+
+            def parse_gkg_location_entry(count_entry):
+                locationTypeMap = {"1": "COUNTRY", "2": "USSTATE", "3":"USCITY", "4":"WORLDCITY", "5":"WORLDSTATE"}
+                parsed_entries = []
+                if count_entry:
+                    entries = count_entry.split(';')
+                    for entry in entries:
+                        if entry:
+                            parts = entry.split('#')
+                            parsed_entry = {
+                                "LocationType": locationTypeMap.get(parts[0], parts[0]) if len(parts) > 0 and parts[0] else None,
+                                "LocationName": parts[1] if len(parts) > 1 else None,
+                                "CountryCode": parts[2] if len(parts) > 2 else None,
+                                "ADM1Code": parts[3] if len(parts) > 3 else None,
+                                "Latitude": float(parts[4]) if len(parts) > 4 and parts[4] else None,
+                                "Longitude": float(parts[5]) if len(parts) > 5 and parts[5] else None,
+                                "LocationFeatureID": parts[6] if len(parts) > 6 else None
+                            }
+                            parsed_entries.append(parsed_entry)
+                
+                # Return None if no entries were found
+                return parsed_entries if len(parsed_entries) > 0 else None
+
+            gkg_location_schema = ArrayType(StructType([
+                StructField("LocationType", StringType(), True),
+                StructField("LocationName", StringType(), True),
+                StructField("CountryCode", StringType(), True),
+                StructField("ADM1Code", StringType(), True),
+                StructField("Latitude", FloatType(), True),
+                StructField("Longitude", FloatType(), True),
+                StructField("LocationFeatureID", StringType(), True)
+            ]))
+
+            parse_gkg_location_entry_udf = udf(parse_gkg_location_entry, gkg_location_schema)
+
+            def parse_tone(tone_entry):
+                # Split the comma-separated string and convert to floats
+                if tone_entry:
+                    values = tone_entry.split(',')
+                    return {
+                        "Tone": float(values[0]) if len(values) > 0 else None,
+                        "PositiveScore": float(values[1]) if len(values) > 1 else None,
+                        "NegativeScore": float(values[2]) if len(values) > 2 else None,
+                        "Polarity": float(values[3]) if len(values) > 3 else None,
+                        "ActRefDensity": float(values[4]) if len(values) > 4 else None,
+                        "SelfGroupRefDensity": float(values[5]) if len(values) > 5 else None
+                    }
+                return {}
+
+            tone_schema = StructType([
+                StructField("Tone", FloatType(), True),
+                StructField("PositiveScore", FloatType(), True),
+                StructField("NegativeScore", FloatType(), True),
+                StructField("Polarity", FloatType(), True),
+                StructField("ActRefDensity", FloatType(), True),
+                StructField("SelfGroupRefDensity", FloatType(), True)
+            ])
+            parse_tone_udf = udf(parse_tone, tone_schema)
+
+
