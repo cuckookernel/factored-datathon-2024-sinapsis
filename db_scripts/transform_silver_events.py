@@ -287,4 +287,11 @@ bronze_transformed_df = bronze_transformed_df.select(
 # COMMAND ----------
 
 # Now write the transformed data to the silver table
-bronze_transformed_df.write.mode("append").partitionBy(silver_events.partition).saveAsTable(silver_events.table_name)
+# bronze_transformed_df.write.mode("append").partitionBy(silver_events.partition).saveAsTable(silver_events.table_name)
+
+# Overwrite the silver table with the new data to avoid duplicates if we reprocessed the data
+(bronze_transformed_df
+    .write.mode("overwrite")
+    .option("replaceWhere", f"{silver_events.partition} >= '{start_date_str}' AND {silver_events.partition} <= '{end_date_str}'")
+    .partitionBy(silver_events.partition)
+    .saveAsTable(silver_events.table_name))
