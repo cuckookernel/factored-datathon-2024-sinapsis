@@ -85,7 +85,7 @@ else:
     files_to_ingest = filtered_files.join(checkpoint_df, ["date_str", "event_type"], "left_anti")
     new_files = files_to_ingest
 
-print(f"Found {new_files.count()} new files to ingest.")
+print(f"Found {files_to_ingest.count()} new files to ingest.")
 
 # COMMAND ----------
 
