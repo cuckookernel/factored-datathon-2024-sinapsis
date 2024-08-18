@@ -27,6 +27,7 @@ lint.ignore = [
     , "RET506" # Unnecessary `else` after `raise` statement
     , "T201" # `print` found
     , "T203" # `pprint` found
+    , "TD003" # TD003 Missing issue link on the line following this TODO
     , "TRY003" # Avoid specifying long messages outside the exception class
     , "UP006" # [*] Use `dict` instead of `Dict` for type annotations
     , "UP007" # [*] Use `X | Y` ~  Union[X, Y]   for type annotation, python 3.10
@@ -61,5 +62,5 @@ exclude = [
 
 # No need to document tests as it's usually obvious what they are testing.
 # Also assert is Ok en tests!
-"test/**" = ["S101", "D103"]
+"tests/**" = ["S101", "D103"]
 "feat_store/test/**" = ["S101", "D103"]

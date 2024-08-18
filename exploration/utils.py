@@ -152,11 +152,12 @@ def top_frequent(series: Series, top: int | None = None,
     return pd.concat([val_pct.iloc[:idx + 1][['value', 'pct']], last_row])
 
 
-def plot_top_frequent(series: Series, top: int):
+def plot_top_frequent(series: Series, top: int) -> Axis:
+    """Make bar plot of most frequent values and their frequencies"""
     top_df = top_frequent(series, top=top)
     top_df1 = top_df.iloc[:-1].sort_values('pct', ascending=True)
 
-    other_mask = top_df['value'].str.contains('*OTHER*', regex=False)
+    other_mask = top_df['value'].astype(str).str.contains('*OTHER*', regex=False)
     other_row = top_df.loc[other_mask].iloc[0]
 
     ax = top_df1.plot(y="pct", kind="barh",

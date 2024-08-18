@@ -3,3 +3,6 @@
   and with what time difference (i.e. histogram by time difference)
 
 - Use IsRootEvent column to identify precursor events...
+
+- Compute avg goldstein score grouping by ev_code, ev_root_code, etc...
+- 

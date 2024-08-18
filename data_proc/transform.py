@@ -37,6 +37,7 @@ class CodeDescEnricher:
 
 
 def enrich_events_ip(enricher: CodeDescEnricher, events_df: DataFrame) -> None:
+    """Add description columns for all intersting codes"""
     # %%
     enricher.enrich_ip(events_df, "quad_class", "quad_classes")
     enricher.enrich_ip(events_df, "ev_code", "cameo_event")

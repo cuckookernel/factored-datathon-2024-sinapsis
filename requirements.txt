@@ -1,9 +1,11 @@
 beautifulsoup4==4.12.3
 click==8.1.7 # CLI construction
+dataset==1.6.2
 mypy==1.11.1  # static type checking for better quality code
 pandas==2.2.2
 pandas-stubs~=2.2.2
 pyarrow==17.0.0
+pydantic==2.8.2
 python-dotenv==1.0.1
 requests==2.31.0
 types-requests~=2.31

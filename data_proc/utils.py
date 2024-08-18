@@ -1,5 +1,6 @@
 """Utilties for data processing"""
 from collections.abc import Mapping
+from typing import TypeVar
 
 from data_proc.common import NaN
 from shared import Optional, Path, logging, np, re
@@ -98,4 +99,14 @@ def try_to_int(a: str, default: int = 1) -> int:
         return int(a)
     except ValueError:
         L.info("Invalid value for int conversion")
+        return default
+
+
+T_ = TypeVar("T_")
+
+def try_int_or(a:str, default: T_) -> int | T_:
+    """Try converting `a` to int. On failure return `default`"""
+    try:
+        return int(a)
+    except ValueError:
         return default
