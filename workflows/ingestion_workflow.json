@@ -5,6 +5,11 @@
   },
   "webhook_notifications": {},
   "timeout_seconds": 0,
+  "schedule": {
+    "quartz_cron_expression": "13 0 11 * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "PAUSED"
+  },
   "max_concurrent_runs": 1,
   "tasks": [
     {
@@ -68,6 +73,28 @@
       "webhook_notifications": {}
     },
     {
+      "task_key": "transform_events",
+      "depends_on": [
+        {
+          "task_key": "ingest_events"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "db_scripts/transform_silver_events",
+        "source": "GIT"
+      },
+      "job_cluster_key": "Job_cluster",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "notification_settings": {
+        "no_alert_for_skipped_runs": false,
+        "no_alert_for_canceled_runs": false,
+        "alert_on_last_attempt": false
+      },
+      "webhook_notifications": {}
+    },
+    {
       "task_key": "transform_gkg",
       "depends_on": [
         {
@@ -90,20 +117,26 @@
       "webhook_notifications": {}
     },
     {
-      "task_key": "transform_events",
+      "task_key": "transform_gkgcounts",
       "depends_on": [
         {
-          "task_key": "ingest_events"
+          "task_key": "ingest_gkgcounts"
         }
       ],
       "run_if": "ALL_SUCCESS",
       "notebook_task": {
-        "notebook_path": "db_scripts/transform_silver_events",
+        "notebook_path": "db_scripts/transform_silver_gkg_counts",
         "source": "GIT"
       },
       "job_cluster_key": "Job_cluster",
       "timeout_seconds": 0,
-      "email_notifications": {}
+      "email_notifications": {},
+      "notification_settings": {
+        "no_alert_for_skipped_runs": false,
+        "no_alert_for_canceled_runs": false,
+        "alert_on_last_attempt": false
+      },
+      "webhook_notifications": {}
     }
   ],
   "job_clusters": [
