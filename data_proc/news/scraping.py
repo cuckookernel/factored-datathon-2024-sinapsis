@@ -48,8 +48,8 @@ REL_DIRS = {
     "events": "last_1y_events",
 }
 
-TBL_WISHES = "scrape_wishes"
-TBL_RESULTS = "scrape_results"
+TBL_SCRAPE_WISHES = "scrape_wishes"
+TBL_SCRAPE_RESULTS = "scrape_results"
 # %%
 
 def gen_scrape_wishlist(typ: GdeltV1Type,
@@ -62,10 +62,10 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
         raise NotImplementedError(f"Not yet implemented for typ=`{typ}`")
     # %%
     db = get_scraping_db()
-    db_tbl: Table = db.create_table(TBL_WISHES,
+    db_tbl: Table = db.create_table(TBL_SCRAPE_WISHES,
                                     primary_id="url_hash", primary_type=db.types.string)
     # %%
-    db.create_table(TBL_RESULTS,
+    db.create_table(TBL_SCRAPE_RESULTS,
                     primary_id="url_hash", primary_type=db.types.string)
 
     # %%
@@ -129,19 +129,21 @@ def _interactive_testing() -> None:
     db.close()
     # %%
 
-def run_scraping(batch_size: int) -> None:
+def run_scraping(batch_size: int, limit: int = 1000) -> None:
     """Run scraping and text extraction of yet unscraped urls"""
     # %%
     db = get_scraping_db()
 
-    pending_urls = db.query("""
+    pending_urls = db.query(f"""
         select w.url_hash, w.url
         from scrape_wishes as w
         left join scrape_results as r
             on  w.url_hash = r.url_hash
         where r.url_hash is null
         order by w.url_hash
-    """)
+        limit {limit}
+        """, # noqa: S608
+    )
     # %%
     pending_urls_all = pd.DataFrame(pending_urls)
     n_pending = len(pending_urls_all)
@@ -160,6 +162,8 @@ def run_scraping(batch_size: int) -> None:
         batch = []
 
         scrape_batch(batch)
+
+    db.close()
 
     # %%
 
@@ -194,7 +198,7 @@ def scrape_batch(batch: list[Series]) -> None:
                                          request_err=None)
 
     db = get_scraping_db()
-    res_tbl = db.get_table(TBL_RESULTS)
+    res_tbl = db.get_table(TBL_SCRAPE_RESULTS)
     res_tbl.insert_many([res.dict() for res in results.values()])
 
 
@@ -248,6 +252,25 @@ def get_scraping_db() -> Database:
 def _gen_url_hash(url: str) -> str:
     return sha256(url.encode("utf8")).hexdigest()[:32]
 
+
+def dump_scrape_results_to_parquet():
+    # %%
+    from datetime import datetime
+    from data_proc.common import UTC, gdelt_base_data_path
+    # %%
+    now_str = datetime.now(tz=UTC).isoformat()[:-13].replace(":", "")
+    db = get_scraping_db()
+    results_tbl = db[TBL_SCRAPE_RESULTS]
+    results_df = pd.DataFrame(results_tbl.all())
+    results_df.to_parquet(gdelt_base_data_path() / f"scrape_results.{now_str}.parquet" )
+    db.close()
+    # %%
+    db = get_scraping_db()
+    wishes_tbl = db[TBL_SCRAPE_WISHES]
+    wishes_df = pd.DataFrame(wishes_tbl.all())
+    wishes_df.to_parquet(gdelt_base_data_path() / f"scrape_wishes.{now_str}.parquet")
+    db.close()
+    # %%
 
 if __name__ == "__main__":
     run_scraping(batch_size=10)

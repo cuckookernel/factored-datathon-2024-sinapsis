@@ -6,7 +6,7 @@ import logging
 import os
 import re  # noqa: F401
 from collections.abc import Callable, Mapping  # noqa: F401
-from datetime import date, time, timedelta  # noqa: F401
+from datetime import date, time, datetime, timedelta  # noqa: F401
 from pathlib import Path  # noqa: F401
 from typing import Any, Optional, TypeVar  # noqa: F401
 
@@ -35,7 +35,7 @@ def read_env() -> None:
 
     DO NOT USE in prod!
     """
-    load_dotenv(f"{os.environ['HOME']}/profile.env")
+    load_dotenv(f"{os.environ['HOME']}/profile.env", override=True)
 
 
 def runpyfile(path: str) -> None:

@@ -1,6 +1,8 @@
 
 Teo:
 
+- [ ] Upload notebooks to gdrive / google colab?
+
 - [X] Create view of events, crossing with cameo codes
 - [X] Null percents all columns
 - [X] Pct each value categorical columns
