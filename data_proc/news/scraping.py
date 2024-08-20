@@ -175,7 +175,7 @@ def scrape_batch(batch: list[Series]) -> None:
 
     for record in batch:
         url_hash = record['url_hash']
-        print(record['url'])
+        L.info('Working on url=%r', record['url'])
 
         content, status_code, req_err = get_from_cache_or_request(record['url'], url_hash)
 
@@ -188,13 +188,13 @@ def scrape_batch(batch: list[Series]) -> None:
                                              request_err=req_err)
             continue
 
-        text = extract_text(content)
-        L.info("url_hash:%s  extracted text length: %d", url_hash, len(text))
+        x_text = extract_text(content)
+        L.info("url_hash='%s'  x-text-length=%d", url_hash, len(x_text))
         results[url_hash] = ScrapeResult(url_hash=url_hash,
                                          status_code=status_code,
                                          scraped_len=len(content),
-                                         scraped_text_len=len(text),
-                                         scraped_text=text,
+                                         scraped_text_len=len(x_text),
+                                         scraped_text=x_text,
                                          request_err=None)
 
     db = get_scraping_db()
@@ -216,13 +216,12 @@ def get_from_cache_or_request(url: str,
     """
     local_path = cache_dir() / f"{url_hash}.dat"
     if local_path.exists():
-        L.info(f"Found in cache: {url_hash}")
         return local_path.read_bytes(), HTTPStatus.OK, None
     else:
         try:
             resp = requests.get(url, timeout=30)
         except Exception as err:  # noqa: BLE001
-            L.warning(f"request to `{url}` raised exception: {err!r}")
+            L.warning(f"request to url='{url}' raised exception={err!r}")
             return (b"", 0, repr(err))
 
         status_code = resp.status_code
@@ -231,7 +230,7 @@ def get_from_cache_or_request(url: str,
                 f_out.write(resp.content)
             return resp.content, status_code, None
         else:
-            L.warning(f"Url: `{url}` returned status_code={status_code}")
+            L.warning(f"url='{url}' returned status_code={status_code}")
             return b"", status_code, None
 # %%
 

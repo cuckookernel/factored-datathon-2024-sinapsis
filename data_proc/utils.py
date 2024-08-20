@@ -1,5 +1,5 @@
 """Utilties for data processing"""
-from collections.abc import Mapping
+from collections.abc import Generator, Iterable, Mapping
 from typing import TypeVar
 
 from data_proc.common import NaN
@@ -110,3 +110,22 @@ def try_int_or(a:str, default: T_) -> int | T_:
         return int(a)
     except ValueError:
         return default
+
+
+def batches_from_iter(an_iterable: Iterable[T_], batch_size: int) \
+        -> Generator[list[T_], None, None]:
+    """Produce batches of batch_size of from an iter, until exausting it.
+
+    Note: last batch could have a smaller size
+    """
+    batch: list[T_] = []
+    for item in an_iterable:
+        batch.append(item)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+        else:
+            continue
+
+    if len(batch) > 0:
+        yield batch
