@@ -29,7 +29,6 @@ Data Sources:
 Highly recommended!
 
 1.  Verify python version is 3.10. If not, download that version of Python (but not too recent, e.g. NOT 3.12 or 3.13 as some libraries might not be available for the newest versions of Python)
-S's repo for Factored's 2024 Datathon, on GDELT Data
 
 ```bash
 python3 --version
@@ -52,8 +51,10 @@ source .venv/bin/activate
 4. Install requirements
 
 ```
-pip install -r requirements.txt
+pip install -r requirements.txt -r ml.requirements.txt
 ```
+
+If only doing data engineering leave out `-r ml.requirements.txt`
 
 
 # Profile.env setup (ENV variables)

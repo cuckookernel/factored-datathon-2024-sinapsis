@@ -45,36 +45,39 @@ class ByCacheEmbedder:
 class ByCacheAndBackupEmbedder:
     """Embedder of values using pre-cached embeddings"""
 
-    def __init__(self, *, raw_values: Sequence[str] | Series,
+    def __init__(self, *, text_values: Sequence[str] | Series,
                  reduced_embeddings: NpArray | Tensor,
                  pca: PCA,
                  bkup_transformer_name: str) -> None:
         self.embed_dim = reduced_embeddings.shape[1]
-        if len(raw_values) != reduced_embeddings.shape[0]:
-            raise ValueError(f"Expecting embeddings to have {len(raw_values)} rows, "
+        if len(text_values) != reduced_embeddings.shape[0]:
+            raise ValueError(f"Expecting embeddings to have {len(text_values)} rows, "
                              f"but has {reduced_embeddings.shape[0]}")
-        self.cache = dict(zip(raw_values, reduced_embeddings, strict=False))
+        self.cache = dict(zip(text_values, reduced_embeddings, strict=False))
         if pca.n_components != self.embed_dim:
             raise ValueError(f"Expected pca.n_components to be {self.embed_dim} but "
                              f"it is {pca.n_components}")
         self.pca = pca
         self.bkup_transformer_name = bkup_transformer_name
-        self.bkup_transformer: Optional[SentenceTransformer] = None
+        self.bkup_transformer: Optional[SentenceTransformer] \
+            = SentenceTransformer(self.bkup_transformer_name)
 
-    def transform(self, raw_values: Sequence[str] | Series) -> Sequence[NpArray]:
+    def transform(self, text_values: list[str] | Series) -> Sequence[NpArray]:
         """PRoduce embeddings from raw_values"""
-        ret: list[np.ndarray] = [ None ] * len(raw_values) # type: ignore [list-item]
+        ret: list[np.ndarray] = [ None ] * len(text_values) # type: ignore [list-item]
 
         pending_idxs: list[int] = []
-        for i, value in enumerate(raw_values):
+        for i, value in enumerate(text_values):
             embed = self.cache.get(value)
             if  embed is not None:
                 ret[i] = embed
             else:
                 pending_idxs.append(i)
 
-        more_embeds = assert_type(self.bkup_transformer, SentenceTransformer,
-                                  ).encode([raw_values[i] for i in pending_idxs])
+        L.info(f"{type(self).__name__}: Embedding {len(text_values)}"
+               f", cache size: {len(self.cache)}, cache misses: {len(pending_idxs)}")
+
+        more_embeds = assert_type(self.bkup_transformer, SentenceTransformer).encode(text_values)
         more_embeds_reduced = self.pca.transform(more_embeds)
 
         for i, embed in zip(pending_idxs, more_embeds_reduced, strict=False):
@@ -87,7 +90,8 @@ class ByCacheAndBackupEmbedder:
         tmp = self.bkup_transformer
         self.bkup_transformer = None
         joblib.dump(self, file_path)
-        L.info(f"Dumped {type(self).__name__} to {file_path} ({file_path.lstat().st_size} bytes)")
+        L.info(f"Dumped {type(self).__name__} to {file_path} "
+               f"({file_path.lstat().st_size/1e6:.2f} MB)")
         self.bkup_transformer = tmp
 
     @classmethod

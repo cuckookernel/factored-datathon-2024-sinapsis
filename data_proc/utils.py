@@ -1,4 +1,5 @@
 """Utilties for data processing"""
+import math
 from collections.abc import Generator, Iterable, Mapping
 from typing import TypeVar
 
@@ -129,3 +130,7 @@ def batches_from_iter(an_iterable: Iterable[T_], batch_size: int) \
 
     if len(batch) > 0:
         yield batch
+
+def is_not_na(val: str | float | None) -> bool:
+    """Val is neither None nor NaN"""
+    return val is not None and (not isinstance(val, float) or not math.isnan(val))

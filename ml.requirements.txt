@@ -1,0 +1,6 @@
+# This file should only be used in jobs that require computing embeddings or
+# doing ml training/inference
+scikit-learn==1.5.1
+sentence-transformers==3.0.1
+torch==2.4.0
+# torchdata==0.8.0

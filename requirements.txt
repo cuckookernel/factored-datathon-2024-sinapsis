@@ -1,3 +1,4 @@
+# for ml related requirments see ml.requirments.txt
 beautifulsoup4==4.12.3
 click==8.1.7 # CLI construction
 databricks-sql-connector==3.3.0
