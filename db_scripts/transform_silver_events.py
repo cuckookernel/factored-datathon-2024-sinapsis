@@ -99,17 +99,17 @@ from pyspark.sql.functions import col, split, when, size
 
 # Split the 'full_geo' column into segments
 a1_split_geo_col = split(col('a1_geo_full_name'), ',')
-bronze_transformed_df = bronze_transformed_df.withColumn("a1_geo_location", when(size(a1_split_geo_col) == 3, a1_split_geo_col.getItem(0)).otherwise(None)) \
-                .withColumn("a1_geo_state", when(size(a1_split_geo_col) >= 2, a1_split_geo_col.getItem(-2)).otherwise(None))
+bronze_transformed_df = bronze_transformed_df.withColumn("a1_geo_location", F.trim(when(size(a1_split_geo_col) == 3, a1_split_geo_col.getItem(0)).otherwise(None))) \
+                .withColumn("a1_geo_state", F.trim(when(size(a1_split_geo_col) >= 2, a1_split_geo_col.getItem(size(a1_split_geo_col) - 2)).otherwise(None)))
 
 
 a2_split_geo_col = split(col('a2_geo_full_name'), ',')
-bronze_transformed_df = bronze_transformed_df.withColumn("a2_geo_location", when(size(a2_split_geo_col) == 3, a2_split_geo_col.getItem(0)).otherwise(None)) \
-                .withColumn("a2_geo_state", when(size(a2_split_geo_col) >= 2, a2_split_geo_col.getItem(-2)).otherwise(None))
+bronze_transformed_df = bronze_transformed_df.withColumn("a2_geo_location", F.trim(when(size(a2_split_geo_col) == 3, a2_split_geo_col.getItem(0)).otherwise(None))) \
+                .withColumn("a2_geo_state", F.trim(when(size(a2_split_geo_col) >= 2, a2_split_geo_col.getItem(size(a1_split_geo_col) - 2)).otherwise(None)))
 
 action_split_geo_col = split(col('action_geo_full_name'), ',')
-bronze_transformed_df = bronze_transformed_df.withColumn("action_geo_location", when(size(action_split_geo_col) == 3, action_split_geo_col.getItem(0)).otherwise(None)) \
-                .withColumn("action_geo_state", when(size(action_split_geo_col) >= 2, action_split_geo_col.getItem(-2)).otherwise(None))
+bronze_transformed_df = bronze_transformed_df.withColumn("action_geo_location", F.trim(when(size(action_split_geo_col) == 3, action_split_geo_col.getItem(0)).otherwise(None))) \
+                .withColumn("action_geo_state", F.trim(when(size(action_split_geo_col) >= 2, action_split_geo_col.getItem(size(a1_split_geo_col) - 2)).otherwise(None)))
 
 # COMMAND ----------
 
@@ -304,6 +304,6 @@ bronze_transformed_df = bronze_transformed_df.select(
 # Overwrite the silver table with the new data to avoid duplicates if we reprocessed the data
 (bronze_transformed_df
     .write.mode("overwrite")
-    .option("replaceWhere", f"{silver_events.partition} >= '{start_date_str}' AND {silver_events.partition} <= '{end_date_str}'")
+    .option("replaceWhere", f"{silver_events.partition} >= '{start_date}' AND {silver_events.partition} <= '{end_date}'")
     .partitionBy(silver_events.partition)
     .saveAsTable(silver_events.table_name))

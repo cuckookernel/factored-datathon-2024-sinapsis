@@ -81,8 +81,8 @@ transformed_df = transformed_df.join(fips_join_df, "geo_country_code", "left")
 # COMMAND ----------
 
 split_geo_col = F.split(F.col('geo_full_name'), ',')
-transformed_df = transformed_df.withColumn("geo_location", F.when(F.size(split_geo_col) == 3, split_geo_col.getItem(0)).otherwise(None)) \
-                .withColumn("geo_state", F.when(F.size(split_geo_col) >= 2, split_geo_col.getItem(-2)).otherwise(None))
+transformed_df = transformed_df.withColumn("geo_location", F.trim(F.when(F.size(split_geo_col) == 3, split_geo_col.getItem(0)).otherwise(None))) \
+                .withColumn("geo_state", F.trim(F.when(F.size(split_geo_col) >= 2, split_geo_col.getItem(F.size(split_geo_col) - 2)).otherwise(None)))
 
 # COMMAND ----------
 
@@ -114,6 +114,6 @@ transformed_df = transformed_df.select(
 # Overwrite the silver table with the new data to avoid duplicates if we reprocessed the data
 (transformed_df
     .write.mode("overwrite")
-    .option("replaceWhere", f"{silver_gkg_counts.partition} >= '{start_date_str}' AND {silver_gkg_counts.partition} <= '{end_date_str}'")
+    .option("replaceWhere", f"{silver_gkg_counts.partition} >= '{start_date}' AND {silver_gkg_counts.partition} <= '{end_date}'")
     .partitionBy(silver_gkg_counts.partition)
     .saveAsTable(silver_gkg_counts.table_name))

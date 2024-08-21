@@ -120,7 +120,7 @@ class DeltaTableHelper:
     class SilverTables:
         class Events:
             table_name = "gdelt.silver_events"
-            partition = "ev_date"
+            partition = "date_added"
             schema = StructType(
                 [
                     StructField("ev_id", IntegerType(), nullable=True),
