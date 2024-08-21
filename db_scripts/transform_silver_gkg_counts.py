@@ -29,7 +29,7 @@ bronze_gkg_counts_schema = DeltaTableHelper.BronzeTables.gkg_counts_schema
 
 bronze_df = spark.read.table(DeltaTableHelper.BronzeTables.gkg_counts_table).where(F.col("pub_date").between(start_date_str, end_date_str))
 
-transformed_df = bronze_df.drop("geo_feat_id", "geo_adm1_code", "geo_country_code")
+transformed_df = bronze_df.drop("geo_feat_id", "geo_adm1_code")
 
 # COMMAND ----------
 
@@ -70,11 +70,19 @@ transformed_df = transformed_df.join(geo_df, on="geo_id", how="left")
 
 # COMMAND ----------
 
+fips_country_codes_df = spark.read.table("gdelt.fips_country_codes")
+fips_join_df = fips_country_codes_df.select(
+    F.col("fips_country_code").alias("geo_country_code"),
+    F.col("country_name").alias("geo_country")
+    )
+
+transformed_df = transformed_df.join(fips_join_df, "geo_country_code", "left")
+
+# COMMAND ----------
+
 split_geo_col = F.split(F.col('geo_full_name'), ',')
 transformed_df = transformed_df.withColumn("geo_location", F.when(F.size(split_geo_col) == 3, split_geo_col.getItem(0)).otherwise(None)) \
-                .withColumn("geo_state", F.when(F.size(split_geo_col) >= 2, split_geo_col.getItem(-2)).otherwise(None)) \
-                .withColumn("geo_country", split_geo_col.getItem(-1))
-
+                .withColumn("geo_state", F.when(F.size(split_geo_col) >= 2, split_geo_col.getItem(-2)).otherwise(None))
 
 # COMMAND ----------
 
@@ -90,6 +98,7 @@ transformed_df = transformed_df.select(
     "object_type",
     "geo_id",
     "geo_type",
+    "geo_country_code",
     "geo_country",
     "geo_state",
     "geo_location",
