@@ -1,4 +1,7 @@
+"""Event aggregation related helpers.
 
+Se also views defined under data_proc/views/event_aggregations.sql
+"""
 import pandas as pd
 
 from data_proc.common import gdelt_base_data_path
@@ -6,7 +9,8 @@ from shared.databricks_conn import get_sql_conn
 
 # %%
 
-def download_event_aggregations():
+def download_event_aggregations() -> None:
+    """Download aggregated event tables to local parquets."""
     # %%
     conn = get_sql_conn()
     data_dir = gdelt_base_data_path()

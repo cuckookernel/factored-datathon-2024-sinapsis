@@ -1,3 +1,4 @@
+"""Run scraping and labeling in an interleaved fashion"""
 from data_proc.news.labeling import EXTRACT_EVENTS_TMPL, GROQ_DEFAULT_MODEL, run_labeling
 from data_proc.news.scraping import run_scraping
 

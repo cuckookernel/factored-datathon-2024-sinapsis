@@ -47,11 +47,7 @@ lint.ignore = [
 exclude = [
     ".git/",
     ".venv/",
-    "test/",
-    "shared/pandas-stubs/",
-    "feat_store/test/",
-    "comms/test/",
-    "legacy/"
+    "notebooks/",
 ]
 
 

@@ -11,7 +11,7 @@ def get_sql_conn() -> Connection:
     """Get connection details from env var and"""
     conn_details = os.environ["DATABRICKS_SQL_CONN_DETAILS"]
     parts = conn_details.split(";")
-    if len(parts) != 3:
+    if len(parts) != 3: # noqa: PLR2004
         raise ValueError("Expected ;-separated string consisting of exactly three parts, "
                          f"but contains {len(parts)}")
 

@@ -3,17 +3,20 @@ import json
 import os
 import re
 import time
+from datetime import datetime
 from hashlib import sha256
 from pprint import pformat
 from re import Match
 from typing import Optional
 
 import anthropic
+import pandas as pd
 from anthropic import Anthropic, BaseModel
 from dataset import Database, Table  # type: ignore # noqa: PGH003
 from dataset.util import ResultIter  # type: ignore # noqa: PGH003
 from groq import Groq
 
+from data_proc.common import UTC, gdelt_base_data_path
 from data_proc.news.scraping import TBL_SCRAPE_RESULTS, get_scraping_db
 from data_proc.utils import batches_from_iter, try_int_or
 from shared import logging, runpyfile
@@ -318,13 +321,7 @@ def remove_indentation(a_str: str) -> str:
     # %%
 
 
-def dump_labels_to_parquet():
-    # %%
-    from datetime import datetime
-
-    import pandas as pd
-
-    from data_proc.common import UTC, gdelt_base_data_path
+def _dump_labels_to_parquet() -> None:
     # %%
     now_str = datetime.now(tz=UTC).isoformat()[:-13].replace(":", "")
     db = get_scraping_db()

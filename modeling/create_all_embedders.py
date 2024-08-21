@@ -1,11 +1,12 @@
-import joblib  # type: ignore
+"""Create embedders for geo_full_name, event descriptions etc..."""
+import joblib  # type: ignore # noqa: PGH003
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from databricks.sql.client import Connection
 from pandas import DataFrame, Series
 from sentence_transformers import SentenceTransformer
-from sklearn.decomposition import PCA  # type: ignore
+from sklearn.decomposition import PCA  # type: ignore # noqa: PGH003
 
 import modeling.embeddings as membs
 from data_proc.common import gdelt_base_data_path
@@ -17,7 +18,7 @@ L = logging.getLogger("cr_embdrs")
 # %%
 
 
-def main():
+def _main() -> None:
     # %%
     db_conn = get_sql_conn()
     # %%
@@ -32,7 +33,7 @@ def main():
 
 
 
-def _interactive_testing(db_conn: Connection):
+def _interactive_testing(db_conn: Connection) -> None:
     # %%
     runpyfile("modeling/create_all_embedders.py")
 
@@ -89,18 +90,20 @@ def _interactive_testing(db_conn: Connection):
 
 def _get_countries(db_conn: Connection) -> Series:
     all_countries = pd.read_sql("""
-                select action_country as country, 
+                select action_country as country,
                     log(1 + count(1)) as log_1p_cnt
                 from gdelt.events_enriched
                 group by action_country
-        """, con=db_conn)
+    """, con=db_conn)
 
     return all_countries['country']
 
 
 def create_country_name_embedder(all_countries_seq: Series,
-                                 final_dim: int = 30, # empirically this achives 70% of explained variance
+                                 final_dim: int = 30,
                                  ) -> tuple[PCA, ByCacheEmbedder]:
+    """Create low dimensionality country name embedder that uses cache"""
+    # empirically this achives 70% of explained variance
     # Load https://huggingface.co/sentence-transformers/all-mpnet-base-v2
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeds = model.encode( list("This event happened in the country of "
@@ -118,7 +121,7 @@ def create_country_name_embedder(all_countries_seq: Series,
 
 def _get_event_descriptions(db_conn: Connection) -> DataFrame:
     event_descs_df = pd.read_sql("""
-                select quad_class_desc, ev_root_desc, ev_desc as ev_desc, 
+                select quad_class_desc, ev_root_desc, ev_desc as ev_desc,
                     log(1 + count(1)) as log_1p_cnt
                 from gdelt.events_enriched
                 group by quad_class_desc, ev_root_desc, ev_desc
@@ -134,7 +137,11 @@ def _get_event_descriptions(db_conn: Connection) -> DataFrame:
 def create_ev_desc_embedder(all_descs_df: DataFrame,
                             final_dim: int,
                            ) -> tuple[PCA, ByCacheEmbedder]:
-    # Load https://huggingface.co/sentence-transformers/all-mpnet-base-v2
+    """Create evending for "full event descriptions"
+
+    full event descriptions should have the format: "<quad_class_desc> - <ev_root_desc> - <ev_desc>"
+    otherwise cache won't work and errors will be logged...
+    """
     model = SentenceTransformer("all-MiniLM-L6-v2")
     full_descs = all_descs_df['full_desc']
     embeds = model.encode( list("Actor 1 did the following to Actor 2: "
@@ -142,7 +149,6 @@ def create_ev_desc_embedder(all_descs_df: DataFrame,
 
     pca_decomp = PCA(n_components=final_dim)
     reduced_embeds = pca_decomp.fit_transform(embeds)
-
     country_embedder = ByCacheEmbedder(raw_values=list(full_descs),
                                        embeddings=reduced_embeds)
 
@@ -150,29 +156,31 @@ def create_ev_desc_embedder(all_descs_df: DataFrame,
 
 
 def _get_geo_full_names(db_conn: Connection, limit: int) -> DataFrame:
-
     total_cnt = pd.read_sql("""
-                            select 
-                                count(1) as cnt                
+                            select
+                                count(1) as cnt
                             from gdelt.events_enriched
                             """,
                             con=db_conn)["cnt"].iloc[0]
 
     geo_full_names_df = pd.read_sql(f"""
-                select action_geo_full_name, 
+                select action_geo_full_name,
                     count(1) as cnt,
                     log(1 + count(1)) as log_1p_cnt
                 from gdelt.events_enriched
                 group by action_geo_full_name
                 order by cnt desc
                 limit {limit}
-        """, con=db_conn)
+        """, # noqa: S608 # only called by our own code, no exposed
+    con=db_conn)
 
     geo_full_names_df['fraction'] = geo_full_names_df['cnt'] / total_cnt
     geo_full_names_df = geo_full_names_df.sort_values('fraction', ascending=False)
     geo_full_names_df = geo_full_names_df.reset_index(drop=True)
-    geo_full_names_df['fraction_cumsum'] = (geo_full_names_df['fraction'] # type: ignore
-                                            .values.cumsum())
+    # type: ignore # noqa: PGH003
+    geo_full_names_df['fraction_cumsum'] = (geo_full_names_df['fraction']
+
+                                            .to_numpy().cumsum())
     # geo_full_names_df['fraction_cum_sum'] = geo_full_names_df.cumsum()
 
     return geo_full_names_df

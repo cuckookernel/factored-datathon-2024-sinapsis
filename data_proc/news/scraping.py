@@ -252,7 +252,7 @@ def _gen_url_hash(url: str) -> str:
     return sha256(url.encode("utf8")).hexdigest()[:32]
 
 
-def dump_scrape_results_to_parquet():
+def _dump_scrape_results_to_parquet() -> None:
     # %%
     from datetime import datetime
 

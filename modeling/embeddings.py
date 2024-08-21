@@ -1,3 +1,4 @@
+"""Embedder classes based on Sentence Transformers"""
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
@@ -91,9 +92,7 @@ class ByCacheAndBackupEmbedder:
 
     @classmethod
     def restore_from_file(cls, file_path: Path) -> Self:
-        """Restore from file and populate  via joblib but avoid storing the whole transformer
-        model with it
-        """
+        """Restore from file and populate via joblib ang populate cls.bkup_tranformer field"""
         L.info(f"Loading {cls.__name__} from {file_path} ({file_path.lstat().st_size} bytes)")
         obj = joblib.load(file_path)
         obj.bkup_transformer = SentenceTransformer(obj.bkup_transformer_name)
