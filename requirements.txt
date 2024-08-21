@@ -1,5 +1,6 @@
 beautifulsoup4==4.12.3
 click==8.1.7 # CLI construction
+databricks-sql-connector==3.3.0
 dataset==1.6.2
 mypy==1.11.1  # static type checking for better quality code
 pandas==2.2.2

@@ -320,9 +320,11 @@ def remove_indentation(a_str: str) -> str:
 
 def dump_labels_to_parquet():
     # %%
-    import pandas as pd
     from datetime import datetime
-    from data_proc.common import gdelt_base_data_path, UTC
+
+    import pandas as pd
+
+    from data_proc.common import UTC, gdelt_base_data_path
     # %%
     now_str = datetime.now(tz=UTC).isoformat()[:-13].replace(":", "")
     db = get_scraping_db()

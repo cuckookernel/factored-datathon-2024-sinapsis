@@ -1,3 +1,4 @@
+
 create or replace view gdelt.events_enriched as (
   select
     qc.ev_desc as quad_class_desc,
@@ -7,9 +8,8 @@ create or replace view gdelt.events_enriched as (
     ev.*,
     fca1.country_name as a1_country,
     fca2.country_name as a2_country,
-    fcact.country_name as action_country
+    fcact.country_name as action_geo_country
   from gdelt.last_1y_events as ev
--- add quad_class and event_coded descriptions
   left join gdelt.gdelt_quad_classes as qc
     on ev.quad_class = qc.quad_class
   left join gdelt.cameo_ev_codes as cec_r
@@ -24,5 +24,6 @@ create or replace view gdelt.events_enriched as (
   left join gdelt.fips_country_codes as fca2
     on ev.a2_geo_country_code = fca2.fips_country_code
   left join gdelt.fips_country_codes as fcact
-    on ev.act_country_code = fcact.fips_country_code
+    on ev.action_geo_country_code = fcact.fips_country_code
 )
+;

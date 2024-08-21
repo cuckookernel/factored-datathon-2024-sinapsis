@@ -3,6 +3,7 @@ import pandas as pd
 
 from data_proc.common import gdelt_base_data_path
 from shared.databricks_conn import get_sql_conn
+
 # %%
 
 def download_event_aggregations():

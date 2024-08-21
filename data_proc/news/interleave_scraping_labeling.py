@@ -1,5 +1,5 @@
+from data_proc.news.labeling import EXTRACT_EVENTS_TMPL, GROQ_DEFAULT_MODEL, run_labeling
 from data_proc.news.scraping import run_scraping
-from data_proc.news.labeling import run_labeling, EXTRACT_EVENTS_TMPL, GROQ_DEFAULT_MODEL
 
 
 def main() -> None:

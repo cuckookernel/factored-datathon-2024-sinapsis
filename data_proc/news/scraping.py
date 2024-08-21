@@ -255,6 +255,7 @@ def _gen_url_hash(url: str) -> str:
 def dump_scrape_results_to_parquet():
     # %%
     from datetime import datetime
+
     from data_proc.common import UTC, gdelt_base_data_path
     # %%
     now_str = datetime.now(tz=UTC).isoformat()[:-13].replace(":", "")

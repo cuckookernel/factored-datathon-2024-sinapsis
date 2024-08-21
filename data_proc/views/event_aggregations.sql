@@ -22,7 +22,8 @@ create or replace view gdelt.events_agg_country_quad_class as (
 create or replace view gdelt.events_agg_country_ev_root as (
    select
       -- action_country,
-      ev_date,
+      -- ev_date,
+      date_added,
       act_country_code as action_country_code,
       action_country,
       ev_root_code,
@@ -36,7 +37,7 @@ create or replace view gdelt.events_agg_country_ev_root as (
       sum(gstein_scale * ee.num_articles) / sum(num_articles)
          as avg_gstein_weighted_articles
    from gdelt.events_enriched as ee
-   group by ev_date, act_country_code, action_country, ev_root_code, ev_root_desc
+   group by date_added, act_country_code, action_country, ev_root_code, ev_root_desc
 )
 ;
 
@@ -57,8 +58,6 @@ create or replace view gdelt.events_agg_country_ev_base as (
       sum(gstein_scale * ee.num_articles) / sum(num_articles)
          as avg_gstein_weighted_articles
    from gdelt.events_enriched as ee
-   group by ev_date, act_country_code, action_country, ev_root_code, ev_root_desc
+   group by ev_date, act_country_code, action_country, ev_base_code, ev_base_desc
 )
 ;
-
--- select * from gdelt.events_agg_country_quad_class;

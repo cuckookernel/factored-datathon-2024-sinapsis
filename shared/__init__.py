@@ -6,13 +6,14 @@ import logging
 import os
 import re  # noqa: F401
 from collections.abc import Callable, Mapping  # noqa: F401
-from datetime import date, time, datetime, timedelta  # noqa: F401
+from datetime import date, datetime, time, timedelta  # noqa: F401
 from pathlib import Path  # noqa: F401
 from typing import Any, Optional, TypeVar  # noqa: F401
 
 import numpy as np  # noqa: F401
 import pandas as pd  # noqa: F401
 from dotenv import load_dotenv
+from numpy import ndarray as NpArray  # noqa: F401
 from pandas import DataFrame, Series, Timedelta, Timestamp  # noqa: F401
 from rich.logging import RichHandler
 
