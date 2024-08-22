@@ -308,21 +308,23 @@ def download_one(url: str,
 
     return None
 
-def download_and_extract_csv(url):
+def download_and_extract_csv(url: str) -> str | None:
+    """Download a csv from gdelt"""
     response = download_one(url)
-    if response.status_code == 200:
-        with zipfile.ZipFile(BytesIO(response.content)) as the_zip:
-            # Assuming the CSV file is the first file in the ZIP archive
-            for file_info in the_zip.infolist():
-                if file_info.filename.lower().endswith('.csv'):
-                    with the_zip.open(file_info.filename) as csv_file:
-                        csv_content = csv_file.read().decode('utf-8')
-                        return csv_content
-    else:
-        print(f"Failed to download {url} with status code {response.status_code}")
+    if response is not None:
+        if response.status_code == HTTPStatus.OK:
+            with zipfile.ZipFile(BytesIO(response.content)) as the_zip:
+                # Assuming the CSV file is the first file in the ZIP archive
+                for file_info in the_zip.infolist():
+                    if file_info.filename.lower().endswith('.csv'):
+                        with the_zip.open(file_info.filename) as csv_file:
+                            return csv_file.read().decode('utf-8')
+        else:
+            print(f"Failed to download {url} with status code {response.status_code}")
+            return None
+    else: # response is None
+        print(f"Failed to download {url}, reponse was None")
         return None
-
-
 
 def _write_one(zipped_data: bytes, sample_fraction:  float, dst_file_path: Path) -> int:
     if len(zipped_data) == 0:

@@ -1,3 +1,6 @@
+"""Bronze and Silver tables declarations"""
+from typing import ClassVar
+
 from pyspark.sql.functions import udf
 from pyspark.sql.types import (
     ArrayType,
@@ -12,6 +15,8 @@ from pyspark.sql.types import (
 
 class DeltaTableHelper:
     class BronzeTables:
+        """Declares all bronze tables"""
+
         gkg_counts_table = "gdelt.bronze_gkgcounts"
         gkg_counts_schema = StructType(
             [
@@ -30,7 +35,7 @@ class DeltaTableHelper:
                 StructField("event_ids", StringType(), True),
                 StructField("sources", StringType(), True),
                 StructField("source_urls", StringType(), True),
-            ]
+            ],
         )
 
         gkg_table = "gdelt.bronze_gkg"
@@ -47,7 +52,7 @@ class DeltaTableHelper:
                 StructField("event_ids", StringType(), True),
                 StructField("sources", StringType(), True),
                 StructField("source_urls", StringType(), True),
-            ]
+            ],
         )
 
         event_table = "gdelt.bronze_events"
@@ -111,11 +116,11 @@ class DeltaTableHelper:
                 StructField("action_geo_feat_id", StringType(), nullable=True),
                 StructField("date_added", IntegerType(), nullable=True),
                 StructField("source_url", StringType(), nullable=True),
-            ]
+            ],
         )
 
-        schema_map = {"gkg": gkg_schema, "events": event_schema, "gkg_counts": gkg_counts_schema}
-        table_map = {"gkg": gkg_table, "events": event_table, "gkg_counts": gkg_counts_table}
+        schema_map: ClassVar = {"gkg": gkg_schema, "events": event_schema, "gkg_counts": gkg_counts_schema}
+        table_map: ClassVar = {"gkg": gkg_table, "events": event_table, "gkg_counts": gkg_counts_table}
 
     class SilverTables:
         class Events:
@@ -179,7 +184,7 @@ class DeltaTableHelper:
                     StructField("avg_tone", FloatType(), nullable=True),
                     StructField("date_added", DateType(), nullable=True),
                     StructField("source_url", StringType(), nullable=True),
-                ]
+                ],
             )
 
         class GKG:
@@ -204,8 +209,8 @@ class DeltaTableHelper:
                                     StructField("Latitude", FloatType(), True),
                                     StructField("Longitude", FloatType(), True),
                                     StructField("LocationFeatureID", StringType(), True),
-                                ]
-                            )
+                                ],
+                            ),
                         ),
                         True,
                     ),
@@ -222,8 +227,8 @@ class DeltaTableHelper:
                                     StructField("Latitude", FloatType(), True),
                                     StructField("Longitude", FloatType(), True),
                                     StructField("LocationFeatureID", StringType(), True),
-                                ]
-                            )
+                                ],
+                            ),
                         ),
                         True,
                     ),
@@ -239,18 +244,19 @@ class DeltaTableHelper:
                                 StructField("Polarity", FloatType(), True),
                                 StructField("ActRefDensity", FloatType(), True),
                                 StructField("SelfGroupRefDensity", FloatType(), True),
-                            ]
+                            ],
                         ),
                         True,
                     ),
                     StructField("event_ids", ArrayType(StringType(), True), True),
                     StructField("sources", ArrayType(StringType(), True), True),
                     StructField("source_urls", ArrayType(StringType(), True), True),
-                ]
+                ],
             )
 
-            def parse_gkg_count_entry(count_entry):
-                locationTypeMap = {
+            @staticmethod
+            def parse_gkg_count_entry(count_entry: str | None) -> list[dict] | None:
+                loc_type_map = {
                     "1": "COUNTRY",
                     "2": "USSTATE",
                     "3": "USCITY",
@@ -269,7 +275,7 @@ class DeltaTableHelper:
                                 if len(parts) > 1 and parts[1].isdigit()
                                 else None,
                                 "ObjectType": parts[2] if len(parts) > 2 else None,
-                                "LocationType": locationTypeMap.get(parts[3], parts[3])
+                                "LocationType": loc_type_map.get(parts[3], parts[3])
                                 if len(parts) > 3 and parts[3]
                                 else None,
                                 "LocationName": parts[4] if len(parts) > 4 else None,
@@ -301,14 +307,15 @@ class DeltaTableHelper:
                         StructField("Latitude", FloatType(), True),
                         StructField("Longitude", FloatType(), True),
                         StructField("LocationFeatureID", StringType(), True),
-                    ]
-                )
+                    ],
+                ),
             )
 
             parse_gkg_count_entry_udf = udf(parse_gkg_count_entry, gkg_counts_schema)
 
-            def parse_gkg_location_entry(count_entry):
-                locationTypeMap = {
+            @staticmethod
+            def parse_gkg_location_entry(count_entry: str) -> list[dict] | None:
+                loc_type_map = {
                     "1": "COUNTRY",
                     "2": "USSTATE",
                     "3": "USCITY",
@@ -316,13 +323,13 @@ class DeltaTableHelper:
                     "5": "WORLDSTATE",
                 }
                 parsed_entries = []
-                if count_entry:
+                if count_entry is not None and count_entry != "":
                     entries = count_entry.split(";")
                     for entry in entries:
                         if entry:
                             parts = entry.split("#")
                             parsed_entry = {
-                                "LocationType": locationTypeMap.get(parts[0], parts[0])
+                                "LocationType": loc_type_map.get(parts[0], parts[0])
                                 if len(parts) > 0 and parts[0]
                                 else None,
                                 "LocationName": parts[1] if len(parts) > 1 else None,
@@ -351,13 +358,14 @@ class DeltaTableHelper:
                         StructField("Latitude", FloatType(), True),
                         StructField("Longitude", FloatType(), True),
                         StructField("LocationFeatureID", StringType(), True),
-                    ]
-                )
+                    ],
+                ),
             )
 
             parse_gkg_location_entry_udf = udf(parse_gkg_location_entry, gkg_location_schema)
 
-            def parse_tone(tone_entry):
+            @staticmethod
+            def parse_tone(tone_entry) -> dict:
                 # Split the comma-separated string and convert to floats
                 if tone_entry:
                     values = tone_entry.split(",")
@@ -379,7 +387,7 @@ class DeltaTableHelper:
                     StructField("Polarity", FloatType(), True),
                     StructField("ActRefDensity", FloatType(), True),
                     StructField("SelfGroupRefDensity", FloatType(), True),
-                ]
+                ],
             )
             parse_tone_udf = udf(parse_tone, tone_schema)
 
@@ -404,5 +412,5 @@ class DeltaTableHelper:
                     StructField("event_ids", ArrayType(IntegerType()), True),
                     StructField("sources", ArrayType(StringType()), True),
                     StructField("source_urls", ArrayType(StringType()), True),
-                ]
+                ],
             )

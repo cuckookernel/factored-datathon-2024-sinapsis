@@ -1,5 +1,5 @@
 """Natural language utils"""
-from pandas import Series, DataFrame
+from pandas import DataFrame, Series
 
 from data_proc.utils import is_not_na
 

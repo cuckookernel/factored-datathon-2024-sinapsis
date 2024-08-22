@@ -23,6 +23,11 @@ create or replace view gdelt.events_enriched as (
     fca1.country_name as a1_country,
     fca2.country_name as a2_country,
     fcact.country_name as action_geo_country,
+    case when ev.action_geo_country_code in ('US', 'CH', 'BR', 'IS', 'IN', 'UK', 'RS') then
+        concat(country, "/", state)
+    else
+        concat(country)
+    end as geo_zone,
     cat1.a_type_desc as a1_type1_desc,
     cat2.a_type_desc as a2_type1_desc
   from pre2 as ev
