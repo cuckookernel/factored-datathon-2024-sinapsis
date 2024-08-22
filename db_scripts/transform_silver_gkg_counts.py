@@ -64,7 +64,7 @@ geo_type_df = spark.read.table("gdelt.geo_type")
 
 geo_df = geo_type_df.select(
     F.col("geo_type").alias("geo_id"),
-    F.col("geo_type_desc").alias("geo_type")
+    F.col("geo_type_desc").alias("geo_type"),
 )
 transformed_df = transformed_df.join(geo_df, on="geo_id", how="left")
 
@@ -73,7 +73,7 @@ transformed_df = transformed_df.join(geo_df, on="geo_id", how="left")
 fips_country_codes_df = spark.read.table("gdelt.fips_country_codes")
 fips_join_df = fips_country_codes_df.select(
     F.col("fips_country_code").alias("geo_country_code"),
-    F.col("country_name").alias("geo_country")
+    F.col("country_name").alias("geo_country"),
     )
 
 transformed_df = transformed_df.join(fips_join_df, "geo_country_code", "left")

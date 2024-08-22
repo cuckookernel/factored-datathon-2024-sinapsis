@@ -296,7 +296,7 @@ bronze_transformed_df = bronze_transformed_df.select(
     "avg_tone",
 
     "date_added",
-    "source_url"
+    "source_url",
 )
 
 # COMMAND ----------

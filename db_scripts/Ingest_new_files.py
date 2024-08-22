@@ -1,5 +1,5 @@
 # Databricks notebook source
-!pip install -r ../requirements.txt
+! pip install -r ../requirements.txt
 
 # COMMAND ----------
 
@@ -138,7 +138,7 @@ for url in url_list:
 if response_dfs:
     union_df = reduce(lambda df1, df2: df1.unionByName(df2), response_dfs)
     display(union_df.groupBy(delta_table_partition).count())
-    
+
     # insert new data
     (union_df
     .write.mode("overwrite")
@@ -151,5 +151,3 @@ if response_dfs:
 
 
 # COMMAND ----------
-
-

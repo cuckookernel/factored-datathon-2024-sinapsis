@@ -35,7 +35,7 @@ display(gkg_table.groupBy('pub_date').count())
 
 def split_column_to_list(column_name, split_char):
     cleaned_column = F.regexp_replace(F.col(column_name), f"{split_char}$", "")  # Remove trailing split_char
-    
+
     # Return None if the string is empty or only spaces
     validated_column = F.when(cleaned_column == "", None).otherwise(cleaned_column)
 
