@@ -1,5 +1,5 @@
 # Databricks notebook source
-!pip install -r ../requirements.txt
+# MAGIC %pip install -r ../requirements.txt
 
 # COMMAND ----------
 

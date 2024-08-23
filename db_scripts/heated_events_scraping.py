@@ -1,87 +1,56 @@
 # Databricks notebook source
 # MAGIC %pip install -r ../requirements.txt
+"""Databricks script for scraping of most heated events"""
 
 # COMMAND ----------
 
-import pandas as pd
 import logging
+from collections.abc import Iterable
+from datetime import date
 from importlib import reload
-import data_proc.news.scraping_most_heated_events as scmh
 
-from datetime import date 
-from pyspark.sql import DataFrame
-from typing import Optional, Iterable
-from data_proc.news.scraping import EV_HEAT_TABLE, gen_url_hash
-from pyspark.sql.types import StructType, StructField, StringType, LongType, DateType
-from pyspark.sql.functions import col, udf
-from pyspark.sql.session import SparkSession
+import pandas as pd
 from pyspark.sql import functions as F
+from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
+
+import data_proc.news.local_scraping_most_heated_events as scmh
+from data_proc.news.scraping import get_most_heated_events_spark
 
 logging.getLogger().setLevel("WARN")
 
 
 # COMMAND ----------
 
+spark_ = spark  # noqa: F821  # avoid undefined name errors from linter
+display_ = display # noqa: F821  # avoid undefined name errors from linter
 heat_date = date(2023, 8, 11)
 top_k = 3
 
 # COMMAND ----------
 
 
-HEATED_EVENTS_SQL_TMPL = """
-    with pre as (
-        select
-            *,
-            row_number() over (partition by geo_zone order by ev_heat desc) as rank            
-        from {heat_table}
-        where
-            heat_date = '{heat_date}'
-            and country_code is not null and geo_zone is not null and geo_zone != ''
-    )
-    select * from pre
-        where rank <= {top_k}
-""" # noqa: S608
-
-gen_url_hash_udf = udf(gen_url_hash)
-
-def get_most_heated_events_spark(spark: SparkSession, *, heat_date: date, top_k: int) -> DataFrame:
-    """Get most top_k most significant events for each geo_zone
-
-    Returns
-    -------
-        DataFrame with one row per unique url
-
-    """
-    query = HEATED_EVENTS_SQL_TMPL.format(heat_table=EV_HEAT_TABLE, heat_date=heat_date, top_k=top_k)
-    query_result_df = spark.sql(query).drop_duplicates("source_url")
-    ret_df = query_result_df.withColumn('url_hash', 
-                                       gen_url_hash_udf(col('source_url')))
-
-    return ret_df
-
-heated_events = get_most_heated_events_spark(spark, heat_date=heat_date, top_k=top_k)
-
+heated_events = get_most_heated_events_spark(spark_,
+                                             heat_date=heat_date,
+                                             top_k=top_k)
 
 # COMMAND ----------
-
-
-
-display(heated_events.limit(100))
+display_(heated_events.limit(100))
 
 # COMMAND ----------
 
 
 reload(scmh)
-def scrape_from_df(pd_df: pd.DataFrame) -> DataFrame:
-    return pd_df.apply(scmh.scrape_one, axis=1)
 
-def scrape_from_df_iter(pd_dfs: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
+def _scrape_from_df_iter(pd_dfs: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
+    def _scrape_from_df(pd_df: pd.DataFrame) -> pd.DataFrame:
+        return pd_df.apply(scmh.scrape_one, axis=1)
+
     for df in pd_dfs:
-        yield scrape_from_df(df)
+        yield _scrape_from_df(df)
 
 # COMMAND ----------
 
-results_table = spark.table("gdelt.scraping_results")
+results_table = spark_.table("gdelt.scraping_results")
 print(results_table.schema)
 results_table.limit(10).collect()
 
@@ -89,28 +58,26 @@ results_table.limit(10).collect()
 
 
 scrape_result_schema = StructType([
-    StructField('source_url', StringType(), True), 
-    StructField('scraped_text', StringType(), True), 
-    StructField('status_code', LongType(), True), 
-    StructField('url_hash', StringType(), True), 
-    StructField('scraped_len', LongType(), True), 
+    StructField('source_url', StringType(), True),
+    StructField('scraped_text', StringType(), True),
+    StructField('status_code', LongType(), True),
+    StructField('url_hash', StringType(), True),
+    StructField('scraped_len', LongType(), True),
     StructField('scraped_text_len', LongType(), True),
     StructField('request_err', StringType(), True),
     StructField('part_date', DateType(), True)
 ])
-scrape_results = (heated_events # TODO (MATEO): remove limit
-                  .mapInPandas(scrape_from_df_iter, schema=scrape_result_schema)
+scrape_results = (heated_events
+                  .mapInPandas(_scrape_from_df_iter, schema=scrape_result_schema)
                   .withColumn('part_date', F.lit(heat_date))
             )
 
 # COMMAND ----------
-
-display(scrape_results.limit(50))
+display_(scrape_results.limit(10))
 
 # COMMAND ----------
 
-spark.sql("refresh table gdelt.scraping_results")
-
+spark_.sql("refresh table gdelt.scraping_results")
 # COMMAND ----------
 
 (scrape_results
@@ -121,5 +88,3 @@ spark.sql("refresh table gdelt.scraping_results")
 
 
 # COMMAND ----------
-
-
