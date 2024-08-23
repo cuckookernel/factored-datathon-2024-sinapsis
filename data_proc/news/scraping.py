@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from data_proc.common import GdeltV1Type, gdelt_base_data_path
 from shared import logging, runpyfile
+
 # from shared.databricks_conn import run_query
 
 L = logging.getLogger('extraction')

@@ -101,9 +101,11 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
                          scraped_len=scraped_len,
                          scraped_text_len=scraped_text_len,
                          scraped_text=scraped_text,
-                         request_err=resp_res.request_error)
+                         request_err=resp_res.request_error,
+            ).dict()
+    result['part_date'] = record['heat_date']
 
-    return pd.Series(result.dict())
+    return pd.Series(result)
 
 
 def _decode_content(content: bytes, encoding: str | None) -> bytes:

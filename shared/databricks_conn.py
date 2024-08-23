@@ -1,8 +1,9 @@
 """Databricks sql connection helpers"""
 import os
-from typing import Optional, TypeAlias
+from typing import Optional
 
 import pandas as pd
+from databricks import sql
 from pandas import DataFrame
 from pyspark.sql import DataFrame as SparkDF
 from pyspark.sql.session import SparkSession
@@ -10,10 +11,8 @@ from pyspark.sql.session import SparkSession
 # %%
 GenericDF  = DataFrame | SparkDF
 
-def get_sql_conn() -> "databricks.sql.Connection":
+def get_sql_conn() -> "databricks.sql.Connection":  # noqa: F821 # don't want
     """Get connection details from env var and"""
-    from databricks import sql
-
     conn_details = os.environ["DATABRICKS_SQL_CONN_DETAILS"]
     parts = conn_details.split(";")
     if len(parts) != 3: # noqa: PLR2004
