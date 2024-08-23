@@ -76,12 +76,11 @@ def _upload_to_s3(heat_date: date, local_pq_path: Path) -> bool:
     # %%
 
 
-
 def scrape_one(record: Series, use_cache: bool = True) -> Series:
     """Scrape a single record"""
     source_url = record['source_url']
     url_hash = record['url_hash']
-
+    
     L.info('Working on url=%r use_cache=%r', source_url, use_cache)
     resp_res= get_from_s3_or_request(source_url, url_hash, use_cache=use_cache)
 
@@ -101,9 +100,11 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
                          scraped_len=scraped_len,
                          scraped_text_len=scraped_text_len,
                          scraped_text=scraped_text,
-                         request_err=resp_res.request_error)
+                         request_err=resp_res.request_error
+            ).dict()
+    result['part_date'] = record['heat_date']
 
-    return pd.Series(result.dict())
+    return pd.Series(result)
 
 
 def _decode_content(content: bytes, encoding: str | None) -> bytes:
