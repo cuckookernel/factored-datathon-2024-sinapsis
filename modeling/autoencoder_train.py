@@ -30,6 +30,7 @@ class HyperParams:
 
 
 def _interactive_testing() -> None:
+    # TODO: reinclud in ruff checks (drop from ruff.toml[exclude])
     # _download_data_for_autoencoder_training(db_conn,
     #                                        start_date=date(2023, 8, 13),
     #                                        end_date=date.today(),
