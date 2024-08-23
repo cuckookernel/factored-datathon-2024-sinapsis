@@ -3,16 +3,17 @@ import os
 from typing import Optional, TypeAlias
 
 import pandas as pd
-from databricks import sql
-from databricks.sql.client import Connection
 from pandas import DataFrame
+from pyspark.sql import DataFrame as SparkDF
+from pyspark.sql.session import SparkSession
 
-SparkSession: TypeAlias = None
 # %%
+GenericDF  = DataFrame | SparkDF
 
-
-def get_sql_conn() -> Connection:
+def get_sql_conn() -> "databricks.sql.Connection":
     """Get connection details from env var and"""
+    from databricks import sql
+
     conn_details = os.environ["DATABRICKS_SQL_CONN_DETAILS"]
     parts = conn_details.split(";")
     if len(parts) != 3: # noqa: PLR2004
@@ -26,14 +27,14 @@ def get_sql_conn() -> Connection:
 
 
 
-def run_query(query_sql: str, spark: Optional[SparkSession] = None) -> DataFrame:
+def run_query(query_sql: str, spark: Optional[SparkSession] = None) -> GenericDF:
     """Run a query either getting a connection or directly via spark context"""
-    if spark is None:
+    if spark is None: # This means we are running in local
+
         db_conn = get_sql_conn()
         results_df = pd.read_sql(query_sql, db_conn)
         db_conn.close()
     else:
-        # TODO (Mateo): in a spark session do something else here...
-        raise NotImplementedError("Spark session is not None...")
+        return spark.sql(query_sql)
 
     return results_df
