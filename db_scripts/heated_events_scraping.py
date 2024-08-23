@@ -7,7 +7,6 @@
 import logging
 from collections.abc import Iterable
 from datetime import date
-from importlib import reload
 
 import pandas as pd
 from pyspark.sql import functions as F
@@ -20,8 +19,9 @@ logging.getLogger().setLevel("WARN")
 
 # COMMAND ----------
 
-spark_ = spark  # noqa: F821  # avoid undefined name errors from linter
-display_ = display # noqa: F821  # avoid undefined name errors from linter
+# creating aliases to avoid undefined name errors from ruff
+spark_ = spark  # noqa: F821   # type: ignore [name-defined]
+display_ = display # noqa: F821  # type: ignore [name-defined]
 heat_date = date(2023, 8, 11)
 top_k = 3
 
