@@ -1,8 +1,14 @@
 # for ml related requirments see ml.requirments.txt
 beautifulsoup4==4.12.3
+boto3==1.35.4
+boto3-stubs
+botocore==1.35.4
+botocore-stubs
+brotlipy==0.7.0
 click==8.1.7 # CLI construction
 databricks-sql-connector==3.3.0
 dataset==1.6.2
+deflate==0.7.0
 mypy==1.11.1  # static type checking for better quality code
 pandas==2.2.2
 pandas-stubs~=2.2.2

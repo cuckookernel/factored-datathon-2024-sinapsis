@@ -54,6 +54,7 @@ exclude = [
     "db_scripts/transform_silver_events.py",
     "db_scripts/transform_silver_gkg.py",
     "db_scripts/transform_silver_gkg_counts.py",
+    "db_scripts/events_forecast_gold.py",
 ]
 
 

@@ -1,26 +1,27 @@
 """Training of autoencoder"""
 from dataclasses import dataclass
+from importlib import reload
 
+import torch as pt
 from sentence_transformers import SentenceTransformer
 from torch import Tensor, nn, optim
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
+import modeling.autoencoder_arch as arch
 from data_proc.common import gdelt_base_data_path
 from data_proc.nl_util import compute_svp_descriptions
-import modeling.autoencoder_arch as arch
 from modeling.parquet_dataset import ParquetFilesDataset
 from modeling.torch_trainer import Trainer
+from shared import date, logging, pd, runpyfile, timedelta
 from shared.databricks_conn import Connection
-from shared import date, timedelta, logging, pd, runpyfile
-import torch as pt
-
-from pyarrow.parquet import ParquetFile # type: ignore # noqa: PGH003
 
 L = logging.getLogger("ae_train")
 # %%
 
 @dataclass
 class HyperParams:
+    """Training hyper-params"""
+
     layer_dims: list[int]
     batch_size: int = 64
     shuffle_dataset: bool = False
@@ -35,7 +36,7 @@ def _interactive_testing() -> None:
     #                                        days_batch=10)
     # %%
 
-    # TODO: do we need normalization?
+    # TODO (Mateo): do we need normalization?
     # transform = transforms.Compose([
     #    transforms.Normalize((0.5,), (0.5,))
     # ])
@@ -44,18 +45,18 @@ def _interactive_testing() -> None:
     # %%
     train_dataset = ParquetFilesDataset(
         files_dir=gdelt_base_data_path(),
-        # TODO: make blob cover everything!
+        # TODO (Mateo): make blob cover everything!
         file_name_pattern="svp_descs_embeddings_2023-*.parquet",
         feature_cols = ["svp_embedding"],
         target_col = None,
         preload=False,
-        # TODO: remove truncation,
+        # TODO (Mateo): remove truncation,
         truncate_size=100,
     )
 
     valid_dataset = ParquetFilesDataset(
         files_dir=gdelt_base_data_path(),
-        # TODO: make blob cover everything!
+        # TODO (Mateo): make blob cover everything!
         file_name_pattern="svp_descs_embeddings_2024-01-1*.parquet",
         feature_cols=["svp_embedding"],
         target_col=None,
@@ -65,7 +66,6 @@ def _interactive_testing() -> None:
 
     input_dim = train_dataset[0]["svp_embedding"].shape[0]
     L.info(f"Embeddings dim={input_dim}")
-    from importlib import reload
     # %%
     reload(arch)
 
@@ -107,6 +107,7 @@ def run_training(hpars: HyperParams,
                  train_dloader: DataLoader,
                  valid_dloader: DataLoader,
                  n_epochs_log: int = 5) -> arch.Autoencoder:
+    """Train the autoencoder"""
     # %%
 
     model = arch.Autoencoder(hpars.layer_dims)
@@ -160,7 +161,7 @@ def _download_data_for_autoencoder_training(db_conn: Connection,
         L.info(f"date1={date1!r} date2={date2!r} computing descriptions")
         svp_descs_df = compute_svp_descriptions(events_df)
         L.info(f"date1={date1!r} date2={date2!r} computing embeddings")
-        embeddings = embedder.encode(svp_descs_df['svp_desc'])  # type: ignore
+        embeddings = embedder.encode(svp_descs_df['svp_desc'])
         svp_descs_df['svp_embedding'] = list(embeddings)
         out_fpath = gdelt_base_data_path() / f'svp_descs_embeddings_{date1}_{date2}_1pct.parquet'
         svp_descs_df.to_parquet(out_fpath)

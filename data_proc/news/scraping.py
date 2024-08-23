@@ -9,14 +9,16 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from dataset.database import Database, Table  # type: ignore [import-untyped]
-from pandas import Series
+from pandas import DataFrame, Series
 from pydantic import BaseModel
 
 from data_proc.common import GdeltV1Type, gdelt_base_data_path
-from exploration.utils import sample_data
 from shared import logging, runpyfile
+from shared.databricks_conn import run_query
 
 L = logging.getLogger('extraction')
+
+EV_HEAT_TABLE = "gdelt.heat_indicator_by_event_dummy_teo"
 # %%
 
 class ScrapeWish(BaseModel):
@@ -37,6 +39,7 @@ class ScrapeResult(BaseModel):
     """Produced after actually scraping"""
 
     url_hash: str
+    source_url: str
     status_code: int
     scraped_len: int
     scraped_text_len: int | None
@@ -52,27 +55,27 @@ TBL_SCRAPE_WISHES = "scrape_wishes"
 TBL_SCRAPE_RESULTS = "scrape_results"
 # %%
 
+
 def gen_scrape_wishlist(typ: GdeltV1Type,
-                        start_date: date, end_date: date,
-                        fraction: float = 1.0) -> Table:
+                        start_date: date,
+                        # end_date: date,
+                        _fraction: float = 1.0) -> Table:
     """Populate the scrape_wishes list with url records to be scraped later"""
     # %%
-    # TODO (Teo?): Generalize this for events as well?
     if typ != 'gkgcounts':
         raise NotImplementedError(f"Not yet implemented for typ=`{typ}`")
     # %%
     db = get_scraping_db()
     db_tbl: Table = db.create_table(TBL_SCRAPE_WISHES,
                                     primary_id="url_hash", primary_type=db.types.string)
-    # %%
     db.create_table(TBL_SCRAPE_RESULTS,
                     primary_id="url_hash", primary_type=db.types.string)
 
-    # %%
-    # TODO (Adrian): actually get data from databricks...
-    gdelt_data = sample_data(typ, rel_dir= Path(f"last_1y_{typ}"),
-                             start_date=start_date, end_date=end_date, fraction=fraction)
-    gdelt_data['pub_date'] = gdelt_data['pub_date'].astype(str)
+
+    # gdelt_data = sample_data(typ, rel_dir= Path(f"last_1y_{typ}"),
+    #                          start_date=start_date, end_date=end_date, fraction=fraction)
+    gdelt_data = get_most_heated_events(heat_date = start_date, top_k = 1)
+    gdelt_data['pub_date'] = gdelt_data['heat_date'].astype(str)
 
     L.info("gdelt_data typ=%s has %d", typ, len(gdelt_data))
     # %%
@@ -85,7 +88,7 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
             del metadata['source_urls']
             del metadata['event_ids']
 
-            url_hash = _gen_url_hash(url)
+            url_hash = gen_url_hash(url)
             wish = ScrapeWish(
                 url_hash=url_hash,
                 url=url,
@@ -101,12 +104,39 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
             wishes[url_hash] = wish
 
     L.info("Created %s scrape wishes", len(wishes))
-    # %%
     db_tbl.insert_many([wish.dict() for wish in wishes.values()])
-    # %%
 
     return db_tbl
-    # %%
+# %%
+
+
+def get_most_heated_events(*, heat_date: date, top_k: int) -> DataFrame:
+    """Get most top_k most significant events for each geo_zone
+
+    Returns
+    -------
+        DataFrame with one row per event
+
+    """
+    query_sql = f"""
+        with pre as (
+            select
+                *,
+                row_number() over (partition by geo_zone order by ev_heat desc) as rank
+            from {EV_HEAT_TABLE}
+            where
+                heat_date = '{heat_date}'
+                and country_code is not null and geo_zone is not null and geo_zone != ''
+        )
+        select * from pre
+            where rank <= {top_k}
+    """ # noqa: S608
+
+    ret_df = run_query(query_sql)
+    ret_df['url_hash'] = ret_df['source_url'].apply(gen_url_hash)
+    ret_df['heat_date'] = heat_date
+
+    return ret_df
 
 
 
@@ -158,7 +188,7 @@ def run_scraping(batch_size: int, limit: int = 1000) -> None:
 
         scrape_batch(batch)
         n_done += len(batch)
-        L.info(f"Done n_done={n_done} ({n_done/n_pending * 100:.2f} %)")
+        L.info(f"Done n_done={n_done} ({n_done / n_pending * 100:.2f} %)")
         batch = []
 
         scrape_batch(batch)
@@ -185,7 +215,8 @@ def scrape_batch(batch: list[Series]) -> None:
                                              scraped_len=0,
                                              scraped_text_len=0,
                                              scraped_text=None,
-                                             request_err=req_err)
+                                             request_err=req_err,
+                                             source_url=record['url'])
             continue
 
         x_text = extract_text(content)
@@ -195,7 +226,8 @@ def scrape_batch(batch: list[Series]) -> None:
                                          scraped_len=len(content),
                                          scraped_text_len=len(x_text),
                                          scraped_text=x_text,
-                                         request_err=None)
+                                         request_err=None,
+                                         source_url=record['url'])
 
     db = get_scraping_db()
     res_tbl = db.get_table(TBL_SCRAPE_RESULTS)
@@ -248,7 +280,8 @@ def get_scraping_db() -> Database:
     return Database(f"sqlite:///{db_path}")
 
 
-def _gen_url_hash(url: str) -> str:
+def gen_url_hash(url: str) -> str:
+    """Generate a length 32 byte hash for an url"""
     return sha256(url.encode("utf8")).hexdigest()[:32]
 
 

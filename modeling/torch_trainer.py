@@ -1,17 +1,21 @@
+"""Training with torch"""
 from collections import defaultdict
+from collections.abc import Callable
 from time import perf_counter
-from typing import Callable
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
 from shared import logging
+
 L = logging.getLogger("tch_trn")
 
 
 class Trainer:
+    """Somewhat generic Supervise ML model trainer"""
+
     def __init__(self, model: nn.Module, *,
                  batch_proc_fn: Callable[[dict[str, Tensor]], tuple[Tensor, Tensor]],
                  loss_fn: Callable[[Tensor, Tensor], Tensor],
@@ -31,7 +35,6 @@ class Trainer:
             num_epochs: int,
             n_epochs_log: int = 10) -> nn.Module:
         """Run n_pochs of fit"""
-
         start_time = perf_counter()
 
         for epoch in range(num_epochs):
@@ -66,18 +69,18 @@ class Trainer:
 
 
     def compute_valid_loss(self, valid_loader: DataLoader) -> Tensor:
+        """Compute the validation loss"""
         self.model.eval()
 
         with torch.set_grad_enabled(False):  # save memory during inference
-            losses: list[Tensor] = []
-            for batch in valid_loader:
-                losses.append(self._batch_loss(batch).detach())
+            losses: list[float] = [self._batch_loss(batch).item()
+                                   for batch in valid_loader]
 
-        return torch.hstack(losses).mean()
+        return torch.tensor(losses).mean()
 
 
     def _batch_loss(self, batch: dict[str, Tensor]) -> Tensor:
-        input, truth = self.batch_proc_fn(batch)
-        input, truth = input.to(self.device), truth.to(self.device)
-        output = self.model(input)
+        input_, truth = self.batch_proc_fn(batch)
+        input_, truth = input_.to(self.device), truth.to(self.device)
+        output = self.model(input_)
         return self.loss_fn(output, truth)

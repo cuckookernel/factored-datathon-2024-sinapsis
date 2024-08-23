@@ -1,16 +1,20 @@
+"""A Dataset implementation from parquet files in local disk"""
 from bisect import bisect
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from pyarrow.parquet import ParquetFile # type: ignore # noqa: PGH003
+from pyarrow.parquet import ParquetFile  # type: ignore # noqa: PGH003
 from torch import Tensor
 from torch.utils.data import Dataset
+
 from shared import logging
 
 L = logging.getLogger("pq_dset")
 
 class ParquetFilesDataset(Dataset):
+    """A dataset for providing instances from parquet  files"""
+
     def __init__(self, files_dir: Path,
                  file_name_pattern: str,
                  feature_cols: list[str],
@@ -30,7 +34,7 @@ class ParquetFilesDataset(Dataset):
 
         self.all_columns: list[str]
         if target_col is not None:
-            self.all_columns = self.feature_cols + [target_col]
+            self.all_columns = [*self.feature_cols, target_col]
         else:
             self.all_columns = self.feature_cols
 
@@ -39,12 +43,13 @@ class ParquetFilesDataset(Dataset):
             file = ParquetFile(file_path)
             num_rows.append(file.metadata.num_rows)
             for col in self.feature_cols:
-                assert col in file.schema_arrow.names
-            if self.target_col is not None:
-                assert self.target_col in file.schema_arrow.names
+                if col not in file.schema_arrow.names:
+                    raise ValueError(f"{col} not in schema")
+            if self.target_col is not None and self.target_col not in file.schema_arrow.names:
+                    raise ValueError(f"{self.target_col} not in schema")
             file.close()
 
-        self.num_rows_cum = np.cumsum([0] + num_rows)
+        self.num_rows_cum = np.cumsum([0,  *num_rows])
         self.truncate_size = truncate_size
         L.info(f"Total rows={self.num_rows_cum[-1]}")
         self.preloaded_tensors: dict[int, dict[str, Tensor]] = {}
@@ -57,6 +62,7 @@ class ParquetFilesDataset(Dataset):
         return len(self.file_paths)
 
     def __len__(self) -> int:
+        """Total number of instances in the dataset"""
         if self.truncate_size is not None:
             return self.truncate_size
         else:
@@ -77,6 +83,7 @@ class ParquetFilesDataset(Dataset):
         return self.preloaded_tensors[file_idx]
 
     def __getitem__(self, item_idx: int) -> dict[str, Tensor]:
+        """Get the item_idx-th item"""
         file_index = bisect(self.num_rows_cum, item_idx) - 1
 
         tensor_dict = self._file_tensor(file_index)

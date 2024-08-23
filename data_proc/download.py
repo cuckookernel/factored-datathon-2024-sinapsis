@@ -326,6 +326,8 @@ def download_and_extract_csv(url: str) -> str | None:
         print(f"Failed to download {url}, reponse was None")
         return None
 
+    return None
+
 def _write_one(zipped_data: bytes, sample_fraction:  float, dst_file_path: Path) -> int:
     if len(zipped_data) == 0:
         L.warning("No data, nothing to do")

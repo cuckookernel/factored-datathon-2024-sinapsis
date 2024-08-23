@@ -1,10 +1,15 @@
 """Setup widgets controlling the ETL jobs"""
+import datetime as dt
 from datetime import date, datetime, timedelta
 
 import pytz
 from pyspark.dbutils import DBUtils
 
 TZ = pytz.timezone("US/Eastern")
+
+def today() -> date:
+    """Tz aware today"""
+    return dt.datetime.now(tz=TZ).date()
 
 def set_up_date_range_widgets(spark) -> None:
     dbutils = DBUtils(spark)
@@ -20,17 +25,17 @@ def get_date_range(spark) -> tuple[date, date]:
 
     # if we got dates, use them else use current date
     if start_date and end_date:
-        start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=TZ)
-        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=TZ).date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=TZ).date()
     # if we got lookback days, use it
     elif lookback_days:
-        start_date = datetime.today() - timedelta(days=int(lookback_days))
-        end_date = datetime.today()
+        start_date = (datetime.now(tz=TZ) - timedelta(days=int(lookback_days))).date
+        end_date = today()
     # else use default current date
     else:
-        start_date = datetime.today()
-        end_date = datetime.today()
-    return (start_date.date(), end_date.date())
+        start_date = today()
+        end_date = today()
+    return (start_date, end_date)
 
 def set_up_source_widgets(spark) -> None:
     dbutils = DBUtils(spark)
