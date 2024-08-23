@@ -13,8 +13,7 @@ import pandas as pd
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
-import data_proc.news.local_scraping_most_heated_events as scmh
-from data_proc.news.scraping import get_most_heated_events_spark
+from data_proc.news.scraping import get_most_heated_events_spark, scrape_one
 
 logging.getLogger().setLevel("WARN")
 
@@ -39,11 +38,9 @@ display_(heated_events.limit(100))
 # COMMAND ----------
 
 
-reload(scmh)
-
 def _scrape_from_df_iter(pd_dfs: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
     def _scrape_from_df(pd_df: pd.DataFrame) -> pd.DataFrame:
-        return pd_df.apply(scmh.scrape_one, axis=1)
+        return pd_df.apply(scrape_one, axis=1)
 
     for df in pd_dfs:
         yield _scrape_from_df(df)

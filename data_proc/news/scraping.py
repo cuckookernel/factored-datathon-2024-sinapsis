@@ -241,37 +241,16 @@ def get_most_heated_events_spark(spark: SparkSession, *,
 
 def scrape_batch(batch: list[Series]) -> None:
     """Scrape a whole batch and stored results/errors in the scrape db."""
-    results: dict[str, ScrapeResult] = {}
+    results: dict[str, Series] = {}
 
     for record in batch:
         url_hash = record['url_hash']
         L.info('Working on url=%r', record['url'])
-
-        content, status_code, req_err = get_from_cache_or_request(record['url'], url_hash)
-
-        if status_code != HTTPStatus.OK or len(content) == 0:
-            results[url_hash] = ScrapeResult(url_hash=url_hash,
-                                             status_code=status_code,
-                                             scraped_len=0,
-                                             scraped_text_len=0,
-                                             scraped_text=None,
-                                             request_err=req_err,
-                                             source_url=record['url'])
-            continue
-
-        x_text = extract_text(content)
-        L.info("url_hash='%s'  x-text-length=%d", url_hash, len(x_text))
-        results[url_hash] = ScrapeResult(url_hash=url_hash,
-                                         status_code=status_code,
-                                         scraped_len=len(content),
-                                         scraped_text_len=len(x_text),
-                                         scraped_text=x_text,
-                                         request_err=None,
-                                         source_url=record['url'])
+        results[url_hash] = scrape_one(record)
 
     db = get_scraping_db()
     res_tbl = db.get_table(TBL_SCRAPE_RESULTS)
-    res_tbl.insert_many([res.dict() for res in results.values()])
+    res_tbl.insert_many([res.to_dict() for res in results.values()])
 
 
 def scrape_one(record: Series, use_cache: bool = True) -> Series:
