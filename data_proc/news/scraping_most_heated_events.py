@@ -9,7 +9,6 @@ from typing import TypeAlias
 
 import brotli  # type: ignore [import-untyped]
 
-# import gzip
 import deflate  # type: ignore [import-untyped]
 import pandas as pd
 import requests
@@ -74,7 +73,6 @@ def _upload_to_s3(heat_date: date, local_pq_path: Path) -> bool:
                  f"part_date={heat_date}/{local_pq_path.name}")
     return client.put(s3ref , local_pq_path.read_bytes())
     # %%
-
 
 
 def scrape_one(record: Series, use_cache: bool = True) -> Series:
