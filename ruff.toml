@@ -50,7 +50,7 @@ exclude = [
     "notebooks/",
     # Databriks notebooks used by jobs, !pip install class at the beginning
     # gets marked as syntax error
-    "db_scripts/Ingest_new_files.py",
+    # "db_scripts/Ingest_new_files.py",
     "db_scripts/transform_silver_events.py",
     "db_scripts/transform_silver_gkg.py",
     "db_scripts/transform_silver_gkg_counts.py",

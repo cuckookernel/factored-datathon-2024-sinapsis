@@ -39,9 +39,11 @@ logging.getLogger().setLevel(logging.WARNING)
 csv.field_size_limit(sys.maxsize)
 
 # COMMAND ----------
-# Little hack to enable ruff linting
-spark = spark  # noqa: F821, PLW0127
-display = display # noqa: F821, PLW0127
+# Little hack to enable ruff linting and stop undefined errors from showing in IDE.
+# noinspection PyUnboundLocalVariable
+spark = spark_ = spark  # noqa: F821, PLW0127
+# noinspection PyUnboundLocalVariable
+display = display_ = display # noqa: F821, PLW0127
 
 # get widget values
 set_up_date_range_widgets(spark)
