@@ -8,24 +8,14 @@ dbutils.library.restartPython()
 # COMMAND ----------
 
 """Summarization of selected news via LLMs"""
-import json
 import logging
-import os
-import time
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 from datetime import date
 from importlib import reload
-from typing import TypeAlias
 
 import pyspark.sql as ps
-from groq import Groq
-from pyspark.sql.types import BooleanType, DateType, Row, StringType, StructField, StructType
-
 from data_proc.news.labeling import GROQ_DEFAULT_MODEL, remove_indentation
 import data_proc.news.summarize_news_helpers as snh
 from data_proc.job_helper import get_param_or_default, get_date_range_from_values
-from shared import assert_type
 import data_proc.common as com
 
 reload(com)
@@ -96,5 +86,3 @@ summaries_df.cache().limit(10).display()
 
 
 # COMMAND ----------
-
-

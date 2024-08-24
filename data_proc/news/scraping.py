@@ -9,7 +9,7 @@ from hashlib import sha256
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat
-from typing import Self, TypeAlias
+from typing import TypeAlias
 
 import brotli  # type: ignore [import-untyped]
 import deflate  # type: ignore [import-untyped]
@@ -389,7 +389,7 @@ class RequestResult:
 
     @classmethod
     def from_response(cls, resp: requests.Response | None,
-                      request_error: str | None = None) -> Self:
+                      request_error: str | None = None) -> "RequestResult":
         """Make an instance from requests.Response"""
         if resp is not None:
             content_bytes = (resp.content.encode("utf8") if isinstance(resp.content, str)
@@ -422,7 +422,7 @@ class RequestResult:
         }
 
     @classmethod
-    def from_dict(cls, a_dict: dict[str, ReqDictValueT]) -> Self:
+    def from_dict(cls, a_dict: dict[str, ReqDictValueT]) -> "RequestResult":
         """Make an instance from a dict"""
         return cls(
             status_code=assert_type(a_dict["status_code"], int),
@@ -433,7 +433,7 @@ class RequestResult:
         )
 
     @classmethod
-    def from_json_bytes(cls, json_bytes: bytes) -> Self:
+    def from_json_bytes(cls, json_bytes: bytes) -> "RequestResult":
         """Deserialize from json"""
         a_dict = json.loads(json_bytes.decode("ascii"))
         return cls.from_dict(a_dict)
