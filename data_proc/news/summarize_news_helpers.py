@@ -8,10 +8,9 @@ from datetime import date
 from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
-from databricks.sql.types import Row
 from groq import Groq
 from pyspark.sql.session import SparkSession
-from pyspark.sql.types import BooleanType, DateType, StringType, StructField, StructType
+from pyspark.sql.types import BooleanType, DateType, Row, StringType, StructField, StructType
 
 from data_proc.news.labeling import GROQ_DEFAULT_MODEL, remove_indentation
 from shared import assert_type
@@ -25,6 +24,7 @@ SUMMARIZE_LLM_TMPL = """
     {news_text}
     ```
 """
+
 
 LLMReqParams: TypeAlias = dict[str, str | int | None]
 # %%
@@ -180,7 +180,6 @@ def summarize_one_with_grok(*,
     except Exception as exc:  # noqa: BLE001
         result.error_msg = f"API failure: {exc!r}"
         return res_to_dict(result)
-
 
 
 @dataclass
