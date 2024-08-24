@@ -3,7 +3,7 @@ import json
 import os
 import time
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -62,11 +62,16 @@ def _interactive_testing(spark: SparkSession) -> None:
     partition_row_iter_mapper = make_partition_with_index_mapper(
           id_col="url_hash",
           news_text_col="scraped_text",
+          part_date_col="part_date",
           groq_model=GROQ_DEFAULT_MODEL,
           prompt_tmpl=SUMMARIZE_LLM_TMPL,
           llm_req_params={"max_tokens": 1024,
                           "input_trunc_len": 2000},
     )
+
+    res = SummarizeResult(ext_id='adasd', summary=None, model='a', prompt='b', error_msg=None,
+                          success=False, llm_req_params={}, part_date=date(2013, 1, 1))
+    res_to_dict(res)
 
     summaries_rdd = sdf.rdd.mapPartitionsWithIndex(partition_row_iter_mapper)
 
@@ -105,7 +110,7 @@ def res_to_dict(res: SummarizeResult) -> dict:
     ret['part_date'] = res.part_date
     return ret
 
-SummarizeResultSchema = StructType([
+SUMMARIZE_RESULT_SCHEMA = StructType([
     StructField("ext_id", StringType(), nullable=False),
     StructField("summary", StringType(), nullable=True),
     StructField("model", StringType(), nullable=False),
@@ -180,38 +185,6 @@ def summarize_one_with_grok(*,
     except Exception as exc:  # noqa: BLE001
         result.error_msg = f"API failure: {exc!r}"
         return res_to_dict(result)
-
-
-@dataclass
-class SummarizeResult:
-    """Result of summarization"""
-
-    ext_id: str
-    summary: str | None
-    model: str
-    prompt: str
-    error_msg: str | None
-    success: bool
-    llm_req_params: dict[str, None | int | str]
-
-    def to_dict(self) -> dict:
-        """Represent myself as dict"""
-        ret = {"full": str(self), "full_dict": str(asdict(self))}
-        # ret = asdict(self)
-        ret['llm_req_params'] = json.dumps(self.llm_req_params)
-        return ret
-
-
-SUMMARIZE_RESULT_SCHEMA = StructType([
-    StructField("ext_id", StringType(), nullable=False),
-    StructField("summary", StringType(), nullable=True),
-    StructField("model", StringType(), nullable=False),
-    StructField("prompt", StringType(), nullable=False),
-    StructField("success", BooleanType(), nullable=False),
-    StructField("error_msg", StringType(), nullable=True),
-    StructField("llm_req_params", StringType(), nullable=True),
-])
-# %%
 
 
 def make_pd_df_summarizer(*,
