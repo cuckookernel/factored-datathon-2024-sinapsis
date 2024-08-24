@@ -293,7 +293,6 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
                           scraped_text=scraped_text,
                           request_err=resp_res.request_error,
             ).dict()
-    result['part_date'] = record['heat_date']
 
     return pd.Series(result)
 
