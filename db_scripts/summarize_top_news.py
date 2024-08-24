@@ -12,23 +12,17 @@ dbutils.library.restartPython()
 import json
 import logging
 import os
-from datetime import date
-from collections.abc import Callable
-from dataclasses import dataclass, asdict
-from typing import TypeAlias, Iterable
-
-import pandas as pd
 import time
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from datetime import date
+from typing import TypeAlias
 
-from pyspark.sql.types import Row
-from groq import Groq
-from pydantic import BaseModel
 import pyspark.sql as ps
-from pyspark import RDD
-from pyspark.sql.session import SparkSession
-from pyspark.sql.types import BooleanType, StringType, StructField, StructType, DateType
+from groq import Groq
+from pyspark.sql.types import BooleanType, DateType, Row, StringType, StructField, StructType
 
-from data_proc.news.labeling import remove_indentation, GROQ_DEFAULT_MODEL
+from data_proc.news.labeling import GROQ_DEFAULT_MODEL, remove_indentation
 from shared import assert_type
 
 SUMMARIZE_LLM_TMPL = """
@@ -63,7 +57,7 @@ class SummarizeResult:
 def res_to_dict(res: SummarizeResult) -> dict:
     """Represent myself as dict"""
     # ret = asdict(res) DOESN'T WORK?!!!
-    ret = {}    
+    ret = {}
     ret['ext_id'] = res.ext_id
     ret['summary']  = res.summary
     ret['model'] = res.model
@@ -103,7 +97,7 @@ def make_partition_with_index_mapper(*,
                 api_key_idx=part_idx,
                 groq_model=groq_model,
                 prompt_tmpl=prompt_tmpl,
-                llm_req_params=llm_req_params)                       
+                llm_req_params=llm_req_params)
 
             yield summary_res
 

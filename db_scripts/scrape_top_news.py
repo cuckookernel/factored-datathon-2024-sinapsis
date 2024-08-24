@@ -8,13 +8,14 @@
 import logging
 from collections.abc import Iterable
 from datetime import date
+from importlib import reload
 
 import pandas as pd
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
-import data_proc.news.scraping  as scr
-from importlib import reload
+import data_proc.news.scraping as scr
+
 reload(scr)
 
 logging.getLogger().setLevel("WARN")
