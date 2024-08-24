@@ -1,6 +1,7 @@
 # Databricks notebook source
+# MAGIC
 # MAGIC %pip install -r ../requirements.txt
-"""Databricks script for scraping of most heated events"""
+# MAGIC """Databricks script for scraping of most heated events"""
 
 # COMMAND ----------
 
@@ -12,7 +13,9 @@ import pandas as pd
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
-from data_proc.news.scraping import get_most_heated_events_spark, scrape_one
+import data_proc.news.scraping  as scr
+from importlib import reload
+reload(scr)
 
 logging.getLogger().setLevel("WARN")
 
@@ -22,17 +25,16 @@ logging.getLogger().setLevel("WARN")
 # creating aliases to avoid undefined name errors from ruff
 spark_ = spark  # noqa: F821   # type: ignore [name-defined]
 display_ = display # noqa: F821  # type: ignore [name-defined]
-heat_date = date(2023, 8, 11)
+
+heat_date = date(2023, 8, 10)
 top_k = 3
 
-# COMMAND ----------
-
-
-heated_events = get_most_heated_events_spark(spark_,
+heated_events = scr.get_most_heated_events_spark(spark_,
                                              heat_date=heat_date,
                                              top_k=top_k)
 
 # COMMAND ----------
+
 display_(heated_events.limit(100))
 
 # COMMAND ----------
@@ -40,7 +42,7 @@ display_(heated_events.limit(100))
 
 def _scrape_from_df_iter(pd_dfs: Iterable[pd.DataFrame]) -> Iterable[pd.DataFrame]:
     def _scrape_from_df(pd_df: pd.DataFrame) -> pd.DataFrame:
-        return pd_df.apply(scrape_one, axis=1)
+        return pd_df.apply(scr.scrape_one, axis=1)
 
     for df in pd_dfs:
         yield _scrape_from_df(df)
@@ -70,11 +72,13 @@ scrape_results = (heated_events
             )
 
 # COMMAND ----------
+
 display_(scrape_results.limit(10))
 
 # COMMAND ----------
 
 spark_.sql("refresh table gdelt.scraping_results")
+
 # COMMAND ----------
 
 (scrape_results
@@ -82,6 +86,3 @@ spark_.sql("refresh table gdelt.scraping_results")
     .option("replaceWhere", f"part_date == '{heat_date}'")
     .partitionBy("part_date")
     .saveAsTable("gdelt.scraping_results"))
-
-
-# COMMAND ----------
