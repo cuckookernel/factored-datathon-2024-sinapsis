@@ -1,28 +1,23 @@
-"""Databricks script for scraping of most heated events"""
 # Databricks notebook source
 # MAGIC
 # MAGIC %pip install -r ../requirements.txt
 
 # COMMAND ----------
-import sys
-from importlib import reload
-from pathlib import Path
-
-# COMMAND ----------
-
 import logging
+import sys
 from collections.abc import Iterable
 from datetime import date
+from importlib import reload
+from pathlib import Path
 
 import pandas as pd
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
-
 print("CWD:", Path.cwd())
 sys.path.append("../")
-import data_proc.common as com
-import data_proc.job_helper as jh
-import data_proc.news.scraping as scr
+import data_proc.common as com  # noqa: E402
+import data_proc.job_helper as jh  # noqa: E402
+import data_proc.news.scraping as scr  # noqa: E402
 
 reload(scr)
 reload(com)
