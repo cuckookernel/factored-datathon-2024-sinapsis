@@ -43,6 +43,10 @@ start_date, end_date, source, force_ingestion
 
 # COMMAND ----------
 
+DBUtils.__module__
+
+# COMMAND ----------
+
 # source configs
 if source == "events":
     source_metadata = spark.createDataFrame(download_file_catalog(f"{BASE_URL}/events", "events"))
