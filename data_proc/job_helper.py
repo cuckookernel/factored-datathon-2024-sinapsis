@@ -2,9 +2,10 @@
 import datetime as dt
 from datetime import date, datetime, timedelta
 from pyspark.sql import SparkSession
-
 from data_proc.widget_helper import today
+from typing import TypeVar, Callable
 
+T_ = TypeVar("T_")
 
 def get_lookback_days(spark: SparkSession) -> int:
     dbutils = DBUtils(spark)
