@@ -3,14 +3,11 @@
 
 # COMMAND ----------
 
-dbutils.library.restartPython()
-
-# COMMAND ----------
-
 """Summarization of selected news via LLMs"""
 import json
 import logging
 import os
+import sys
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -35,12 +32,12 @@ spark = spark_ = spark # noqa: F821, PLW0127
 dbutils = dbutils_ = dbutils # noqa: F821, PLW0127
 
 logging.getLogger().setLevel("WARN")
-
+print("PYTHON VERSION ::", sys.version)
 
 # COMMAND ----------
 
-date_start = get_param_or_default(spark, "start_date", date(2023, 8, 23), com.try_parse_date)
-date_end = get_param_or_default(spark, "start_date", date(2023, 8, 23), com.try_parse_date)
+date_start = get_param_or_default(spark, "start_date", date(2024, 8, 23), com.try_parse_date)
+date_end = get_param_or_default(spark, "start_date", date(2024, 8, 23), com.try_parse_date)
 lookback_days = get_param_or_default(spark, "lookback_days", 1, int)
 
 date_start, date_end = get_date_range_from_values(date_start, date_end, lookback_days)
