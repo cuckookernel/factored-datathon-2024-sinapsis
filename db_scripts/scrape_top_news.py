@@ -38,7 +38,8 @@ print(scr.HEATED_EVENTS_SQL_TMPL)
 start_date = jh.get_param_or_default(spark, "start_date", date(2023, 8, 23), com.try_parse_date)
 end_date = jh.get_param_or_default(spark, "end_date", date(2023, 8, 23), com.try_parse_date)
 lookback_days = jh.get_param_or_default(spark, "lookback_days", 1, int)
-ev_heat_table = jh.get_param_or_default(spark, "ev_heat_table", "gdelt.heat_indicator_by_event_dummy_teo")
+ev_heat_table = jh.get_param_or_default(spark, "ev_heat_table",
+                                        "gdelt.heat_indicator_by_event_dummy_teo")
 top_k = jh.get_param_or_default(spark,  "top_k", 1, int)
 
 start_date, end_date = jh.get_date_range_from_values(start_date, end_date, lookback_days)
@@ -103,5 +104,3 @@ spark.sql("refresh table gdelt.scraping_results")
     .saveAsTable("gdelt.scraping_results"))
 
 # COMMAND ----------
-
-
