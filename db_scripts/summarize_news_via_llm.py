@@ -26,7 +26,7 @@ from pydantic import BaseModel
 import pyspark.sql as ps
 from pyspark import RDD
 from pyspark.sql.session import SparkSession
-from pyspark.sql.types import BooleanType, StringType, StructField, StructType
+from pyspark.sql.types import BooleanType, StringType, StructField, StructType, DateType
 
 from data_proc.news.labeling import remove_indentation, GROQ_DEFAULT_MODEL
 from shared import assert_type
@@ -58,11 +58,12 @@ class SummarizeResult:
     error_msg: str | None
     success: bool
     llm_req_params: dict[str, None | int | str]
+    part_date: date
 
 def res_to_dict(res: SummarizeResult) -> dict:
     """Represent myself as dict"""
     # ret = asdict(res) DOESN'T WORK?!!!
-    ret = {}
+    ret = {}    
     ret['ext_id'] = res.ext_id
     ret['summary']  = res.summary
     ret['model'] = res.model
@@ -70,6 +71,7 @@ def res_to_dict(res: SummarizeResult) -> dict:
     ret['error_msg'] = res.error_msg
     ret['success'] = res.success
     ret['llm_req_params'] = json.dumps(res.llm_req_params)
+    ret['part_date'] = res.part_date
     return ret
 
 SummarizeResultSchema = StructType([
@@ -80,11 +82,13 @@ SummarizeResultSchema = StructType([
     StructField("success", BooleanType(), nullable=False),
     StructField("error_msg", StringType(), nullable=True),
     StructField("llm_req_params", StringType(), nullable=True),
+    StructField("part_date", DateType(), nullable=False),
 ])
 
 def make_partition_with_index_mapper(*,
                           id_col: str,
                           news_text_col: str,
+                          part_date_col: str,
                           groq_model: str, prompt_tmpl: str,
                           llm_req_params: LLMReqParams,
                           ) -> Callable[[int, Iterable[Row]], Iterable[dict]]:
@@ -95,10 +99,11 @@ def make_partition_with_index_mapper(*,
             summary_res = summarize_one_with_grok(
                 ext_id=row[id_col],
                 news_text=row[news_text_col],
+                part_date=row[part_date_col],
                 api_key_idx=part_idx,
                 groq_model=groq_model,
                 prompt_tmpl=prompt_tmpl,
-                llm_req_params=llm_req_params)
+                llm_req_params=llm_req_params)                       
 
             yield summary_res
 
@@ -107,6 +112,7 @@ def make_partition_with_index_mapper(*,
 def summarize_one_with_grok(*,
                             ext_id: str,
                             news_text: str | None,
+                            part_date: date,
                             api_key_idx: int,
                             groq_model: str,
                             prompt_tmpl: str,
@@ -119,6 +125,7 @@ def summarize_one_with_grok(*,
     news_text_trunc = news_text[:]
     prompt = remove_indentation(prompt_tmpl.format(news_text=news_text_trunc))
     result = SummarizeResult(ext_id=ext_id,
+                             part_date=part_date,
                              model=groq_model, summary=None, prompt=prompt,
                              success=False,
                              error_msg=None, llm_req_params=llm_req_params)
@@ -146,7 +153,7 @@ def summarize_one_with_grok(*,
 
 # COMMAND ----------
 
-res =  SummarizeResult(ext_id='adasd', summary=None, model='a', prompt='b', error_msg=None, success=False, llm_req_params={})
+res =  SummarizeResult(ext_id='adasd', summary=None, model='a', prompt='b', error_msg=None, success=False, llm_req_params={}, part_date=date(2013, 1, 1))
 res_to_dict(res)
 
 
@@ -158,7 +165,7 @@ part_date_end = date(2023, 8, 12)
 # COMMAND ----------
 
 sdf: ps.DataFrame = spark.sql(f"""select * 
-        from gdelt.scraping_results        
+        from gdelt.scraping_results
         where scraped_text is not Null 
         and part_date >= '{part_date_start}'
         and part_date <= '{part_date_end}'
@@ -172,6 +179,7 @@ sdf.limit(30).display()
 partition_row_iter_mapper = make_partition_with_index_mapper(
           id_col="url_hash",
           news_text_col="scraped_text",
+          part_date_col="part_date",
           groq_model=GROQ_DEFAULT_MODEL,
           prompt_tmpl=SUMMARIZE_LLM_TMPL,
           llm_req_params={"max_tokens": 1024,
@@ -190,13 +198,17 @@ collected
 
 # COMMAND ----------
 
-summaries_df = summaries_rdd.toDF()
+summaries_df = spark.createDataFrame(summaries_rdd, schema=SummarizeResultSchema)
 summaries_df.limit(10).display()
 
 # COMMAND ----------
 
-summaries_df = spark.createDataFrame(summaries_rdd, schema=SummarizeResultSchema)
-summaries_df.limit(10).display()
+(summaries_df
+    .write.mode("overwrite")
+    .option("replaceWhere", f"part_date >= '{part_date_start}' and part_date <= '{part_date_end}'")
+    .partitionBy("part_date")
+    .saveAsTable("gdelt.summary_results"))
+
 
 # COMMAND ----------
 
