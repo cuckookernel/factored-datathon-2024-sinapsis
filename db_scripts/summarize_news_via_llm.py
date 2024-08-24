@@ -186,7 +186,7 @@ partition_row_iter_mapper = make_partition_with_index_mapper(
                           "input_trunc_len": 2000}
     )
 
-summaries_rdd = (sdf.limit(10) # TODO: remove
+summaries_rdd = (sdf
                  .rdd.mapPartitionsWithIndex(partition_row_iter_mapper)
                 ).cache()
 
@@ -194,7 +194,7 @@ summaries_rdd = (sdf.limit(10) # TODO: remove
 # COMMAND ----------
 
 collected = summaries_rdd.collect()
-collected
+collected[:100]
 
 # COMMAND ----------
 
