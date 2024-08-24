@@ -4,18 +4,19 @@ import os
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
-import pyspark.sql as ps
 from databricks.sql.types import Row
 from groq import Groq
-from pyspark import RDD
 from pyspark.sql.session import SparkSession
 from pyspark.sql.types import BooleanType, StringType, StructField, StructType
 
 from data_proc.news.labeling import GROQ_DEFAULT_MODEL, remove_indentation
 from shared import assert_type
+
+if TYPE_CHECKING:
+    import pyspark.sql as ps
 
 SUMMARIZE_LLM_TMPL = """
     Please summarize the following piece of news in no more than 50 words:
@@ -27,12 +28,13 @@ SUMMARIZE_LLM_TMPL = """
 LLMReqParams: TypeAlias = dict[str, str | int | None]
 # %%
 
-def _interactive_testing(spark: SparkSession):
+def _interactive_testing(spark: SparkSession) -> None:
+    from shared import read_env
     from shared.databricks_conn import run_query
     # %%
-    runpyfile("data_proc/news/summarize_news.py")
+    # runpyfile("data_proc/news/summarize_news.py")
     read_env("/home/teo/profile.sinapsis.env")
-    api_key_idx = 0
+    # api_key_idx = 0
     # %%
     texts_df = run_query("select * from gdelt.scraping_results "
                          "where scraped_text is not Null limit 100")
@@ -49,6 +51,7 @@ def _interactive_testing(spark: SparkSession):
     )
 
     result = df_mapper(texts_df)
+    print(result.shape)
     # %%
 
     sdf: ps.DataFrame = spark.sql("select * from gdelt.scraping_results "
@@ -66,8 +69,7 @@ def _interactive_testing(spark: SparkSession):
 
     summaries_rdd = sdf.rdd.mapPartitionsWithIndex(partition_row_iter_mapper)
 
-    dd: RDD = sdf.rdd
-    dd.mapPartitions()
+    print(summaries_rdd)
 # %%
 
 @dataclass
@@ -102,6 +104,7 @@ SummarizeResultSchema = StructType([
 
 
 def n_grok_api_keys() -> int:
+    """Get number of grok api keys"""
     return len(os.environ["GROQ_API_KEYS"].split(";"))
 
 

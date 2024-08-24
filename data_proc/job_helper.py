@@ -3,20 +3,16 @@ from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import TypeVar
 
-from pyspark.sql import SparkSession
+from py4j.protocol import Py4JJavaError
 from pyspark.dbutils import DBUtils
+from pyspark.sql import SparkSession
 
-from shared import logging
-from data_proc.widget_helper import today, TZ
-from shared import assert_type
+from data_proc.widget_helper import TZ, today
+from shared import assert_type, logging
 
 T_ = TypeVar("T_")
 
 L = logging.getLogger("jh")
-
-def get_lookback_days(spark: SparkSession) -> int:
-    dbutils = DBUtils(spark)
-    return int(dbutils.widgets.get("lookback_days"))
 
 
 def get_param_or_default(
@@ -25,12 +21,16 @@ def get_param_or_default(
         default: T_,
         converter: Callable[[str], T_ | None] | None = None,
     ) -> T_:
+    """Attempt getting param from a widget and then converting it.
+
+    On failure return default.
+    """
     dbutils = DBUtils(spark)
     try:
         param_val_str = dbutils.widgets.get(param_name)
-    except Exception as err:
-        L.warning(f"dbutils.widgets.get({param_name!r}) failed with error: {err.args[0]}"
-                  f"(type:({type(err)}), returning default={default!r}")
+    except Py4JJavaError as err:
+        L.warning(f"dbutils.widgets.get({param_name!r}) failed with Py4JJavaError: {err.args[0]}."
+                  f"Returning default={default!r}")
         return default
 
     if param_val_str == "" or param_val_str is None:
@@ -52,17 +52,23 @@ def get_param(
         param_name: str,
         converter: Callable[[str], T_] | None = None,
     ) -> T_:
+    """Get param or exceptign if not possible"""
     dbutils = DBUtils(spark)
-    param_val_str = dbutils.widgets.get(param_name)
+
+    try:
+        param_val_str = dbutils.widgets.get(param_name)
+    except Py4JJavaError as err:
+        L.warning(f"No widget? {err.args[0]}")
+        param_val_str = None
 
     if param_val_str == "" or param_val_str is None:
-        raise RuntimeError(f"No value for param `{param_name}")
+       raise RuntimeError(f"No value for param `{param_name}")
+
+    print(f"Got param value from widget or job param  `{param_name}`='{param_val_str}'")
+    if converter is not None:
+        return converter(param_val_str)
     else:
-        print("Got param value from widget or job param  `{param_name}`='{param_val_str}'")
-        if converter is not None:
-            return converter(param_val_str)
-        else:
-            return param_val_str
+        return param_val_str
 
 def get_date_range_from_values(start_date: date | None,
                                end_date: date | None,

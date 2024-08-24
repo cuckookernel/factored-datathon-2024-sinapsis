@@ -1,15 +1,10 @@
 """Databricks sql connection helpers"""
 import os
-from typing import Optional
 
 import pandas as pd
 from databricks import sql
-from pandas import DataFrame
-from pyspark.sql import DataFrame as SparkDF
-from pyspark.sql.session import SparkSession
 
 # %%
-GenericDF  = DataFrame | SparkDF
 
 def get_sql_conn() -> "databricks.sql.Connection":  # noqa: F821 # don't want
     """Get connection details from env var and"""
@@ -26,14 +21,10 @@ def get_sql_conn() -> "databricks.sql.Connection":  # noqa: F821 # don't want
 
 
 
-def run_query(query_sql: str, spark: Optional[SparkSession] = None) -> GenericDF:
+def run_query(query_sql: str) -> pd.DataFrame:
     """Run a query either getting a connection or directly via spark context"""
-    if spark is None: # This means we are running in local
-
-        db_conn = get_sql_conn()
-        results_df = pd.read_sql(query_sql, db_conn)
-        db_conn.close()
-    else:
-        return spark.sql(query_sql)
+    db_conn = get_sql_conn()
+    results_df = pd.read_sql(query_sql, db_conn)
+    db_conn.close()
 
     return results_df

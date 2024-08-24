@@ -3,29 +3,45 @@
 
 # COMMAND ----------
 
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
-from pyspark.sql import Row
-from functools import reduce
 import csv
 import sys
-import zipfile
-import io
+from functools import reduce
+
+import pyspark.sql as ss
+from pyspark.sql import Row
+from pyspark.sql import functions as F
+from pyspark.sql.types import FloatType, IntegerType, StringType, StructType
+
 # instead of export PYTHONPATH='./'
 # COMMENT from Teo: changed this to actually point to same repo where this notebook resides
-# OLD VERSION: sys.path.append("/Workspace/Repos/rojas.f.adrian@gmail.com/factored-datathon-2024-sinapsis")
+# OLD VERSION:
+#   sys.path.append("/Workspace/Repos/rojas.f.adrian@gmail.com/factored-datathon-2024-sinapsis")
 sys.path.append("../")
-from data_proc.widget_helper import *
 from data_proc.delta_tables_helper import DeltaTableHelper
-from data_proc.common import GdeltV1Type
-from data_proc.download import download_files, raw_files_list, download_file_catalog, BASE_URL, download_one, download_and_extract_csv
-from data_proc.load import load_schema
+from data_proc.download import (
+    BASE_URL,
+    download_and_extract_csv,
+    download_file_catalog,
+)
+from data_proc.widget_helper import (
+    get_date_range,
+    get_force_sync,
+    get_source,
+    set_up_date_range_widgets,
+    set_up_force_sync_widgets,
+    set_up_source_widgets,
+)
+
+# from data_proc.widget_helper import *
 from shared import logging
 
 logging.getLogger().setLevel(logging.WARNING)
 csv.field_size_limit(sys.maxsize)
 
 # COMMAND ----------
+# Little hack to enable ruff linting
+spark = spark  # noqa: F821, PLW0127
+display = display # noqa: F821, PLW0127
 
 # get widget values
 set_up_date_range_widgets(spark)
@@ -39,11 +55,8 @@ source = get_source(spark)
 
 force_ingestion = get_force_sync(spark)
 
-start_date, end_date, source, force_ingestion
-
-# COMMAND ----------
-
-DBUtils.__module__
+print({"start_date": start_date, "end_date": end_date, "source": source,
+       "force_ingestion": force_ingestion})
 
 # COMMAND ----------
 
@@ -73,7 +86,8 @@ else:
 # COMMAND ----------
 
 # filter catalog based on date range
-filtered_files = source_metadata.filter(F.to_date("date_str", "yyyyMMdd").between(start_date, end_date))
+filtered_files = source_metadata.filter(F.to_date("date_str", "yyyyMMdd")
+                                        .between(start_date, end_date))
 display(filtered_files.groupBy("date_str").count())
 
 # COMMAND ----------
@@ -95,27 +109,30 @@ print(f"Found {files_to_ingest.count()} new files to ingest.")
 
 # COMMAND ----------
 
-def csv_to_spark_df(csv_content, schema: StructType, header=True, delimiter='\t'):
+def _csv_to_spark_df(csv_content: str,
+                     schema: StructType,
+                     header: bool = True,
+                     delimiter: str ='\t') -> ss.DataFrame:
     # Create a list of Rows from the CSV content
     csv_reader = csv.reader(csv_content.splitlines(), delimiter=delimiter)
 
     if header:
         next(csv_reader, None)  # skip the headers
 
-    rows = []
+    rows: list[Row] = []
     for row in csv_reader:
-        new_row = []
+        new_row: list[str | int | None | float] = []
         for i, value in enumerate(row):
             field_type = schema[i].dataType
             if isinstance(field_type, IntegerType):
                 try:
                     new_row.append(int(value.strip('"')))
-                except:
+                except ValueError:
                     new_row.append(None)
             elif isinstance(field_type, FloatType):
                 try:
                     new_row.append(float(value.strip('"')))
-                except:
+                except ValueError:
                     new_row.append(None)
             elif isinstance(field_type, StringType):
                 new_row.append(value.strip('"'))
@@ -124,8 +141,7 @@ def csv_to_spark_df(csv_content, schema: StructType, header=True, delimiter='\t'
         rows.append(Row(*new_row))
 
     # Convert the list of Rows to a Spark DataFrame
-    df = spark.createDataFrame(rows, schema)
-    return df
+    return spark.createDataFrame(rows, schema)
 
 # COMMAND ----------
 
@@ -137,7 +153,7 @@ response_dfs = []
 for url in url_list:
     csv_content = download_and_extract_csv(url)
     if csv_content:
-        response_df = csv_to_spark_df(csv_content, source_schema, header=header, delimiter='\t')
+        response_df = _csv_to_spark_df(csv_content, source_schema, header=header, delimiter='\t')
         response_dfs.append(response_df)
 
 # concatenate all the downloaded CSVs into a single DataFrame
@@ -148,10 +164,12 @@ if response_dfs:
     # insert new data
     (union_df
     .write.mode("overwrite")
-    .option("replaceWhere", f"{delta_table_partition} >= '{start_date_str}' AND {delta_table_partition} <= '{end_date_str}'")
+    .option("replaceWhere", f"{delta_table_partition} >= '{start_date_str}' "
+                            f"AND {delta_table_partition} <= '{end_date_str}'")
     .partitionBy(delta_table_partition)
     .saveAsTable(delta_table_name))
 
     # update checkpoint table with new files
-    new_files.write.mode("append").partitionBy("event_type").saveAsTable("gdelt.bronze_scraping_checkpoints")
-
+    (new_files.write.mode("append")
+     .partitionBy("event_type")
+     .saveAsTable("gdelt.bronze_scraping_checkpoints"))

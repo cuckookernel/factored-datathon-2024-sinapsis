@@ -26,7 +26,8 @@ def _interactive_testing(_heated_events: DataFrame) -> None:
     read_env("/home/teo/profile.sinapsis.env")
     runpyfile("data_proc/news/scraping_most_heated_events.py")
     heat_date = date(2024, 8, 8)
-    heated_events = get_most_heated_events_pandas(heat_date=heat_date, top_k=3)
+    heated_events = get_most_heated_events_pandas(start_date=heat_date, end_date=heat_date,
+                                                  top_k=3)
     heated_events_u = heated_events.drop_duplicates(subset=["url_hash"])
     ret: DataFrame = heated_events_u.iloc[:10].apply(scrape_one, axis=1)
     # record = assert_type(heated_events.loc[8], Series)

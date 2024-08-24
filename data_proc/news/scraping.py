@@ -97,7 +97,7 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
     # gdelt_data = sample_data(typ, rel_dir= Path(f"last_1y_{typ}"),
     #                          start_date=start_date, end_date=end_date, fraction=fraction)
     gdelt_data = get_most_heated_events_pandas(heat_date = start_date,
-                                                ev_heat_table=EV_HEAT_TABLE,
+                                               ev_heat_table="gdelt.heat_indicator_by_event_dummy_teo",
                                                top_k = 1)
     gdelt_data['pub_date'] = gdelt_data['heat_date'].astype(str)
 
@@ -141,7 +141,8 @@ HEATED_EVENTS_SQL_TMPL = """
             row_number() over (partition by geo_zone order by ev_heat desc) as rank
         from {heat_table}
         where
-            heat_date = '{heat_date}'
+            heat_date >= '{start_date}'
+            and heat_date <= '{end_date}'
             and country_code is not null and geo_zone is not null and geo_zone != ''
     )
     select * from pre
@@ -284,13 +285,13 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
         scraped_text_len = 0
 
     result = ScrapeResult(url_hash=url_hash,
-                          part_date=record['part_date'],
-                         source_url=source_url,
-                         status_code=resp_res.status_code,
-                         scraped_len=scraped_len,
-                         scraped_text_len=scraped_text_len,
-                         scraped_text=scraped_text,
-                         request_err=resp_res.request_error,
+                          part_date=part_date,
+                          source_url=source_url,
+                          status_code=resp_res.status_code,
+                          scraped_len=scraped_len,
+                          scraped_text_len=scraped_text_len,
+                          scraped_text=scraped_text,
+                          request_err=resp_res.request_error,
             ).dict()
     result['part_date'] = record['heat_date']
 

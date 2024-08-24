@@ -68,7 +68,9 @@ exclude = [
 # Also assert is Ok en tests!
 "tests/**" = ["S101", "D103"]
 "db_scripts/*" = [
-    "E501",
+    "D100", # Missing docstring in public module
+    # "E501",
+    "E402", # Import not at top of file
     "FBT003", # FBT003 Boolean positional value in function call
     "ANN201", # ANN201 Missing return type annotation for public function `download_and_extract_csv`
     "INP001", # is part of package
