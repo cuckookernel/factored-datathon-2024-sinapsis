@@ -98,7 +98,7 @@ spark.sql("refresh table gdelt.scraping_results")
 
 (scrape_results
     .write.mode("overwrite")
-    .option("replaceWhere", f"part_date >= '{start_date} and part_date <= '{end_date}'")
+    .option("replaceWhere", f"part_date >= '{start_date}' and part_date <= '{end_date}'")
     .partitionBy("part_date")
     .saveAsTable("gdelt.scraping_results"))
 
