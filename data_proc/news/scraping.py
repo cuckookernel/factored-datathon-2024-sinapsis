@@ -39,7 +39,7 @@ REQ_HEADERS = {
 
 L = logging.getLogger('extraction')
 
-EV_HEAT_TABLE = "gdelt.heat_indicator_by_event_dummy_teo"
+# EV_HEAT_TABLE = "gdelt.heat_indicator_by_event_dummy_teo"
 # %%
 
 class ScrapeWish(BaseModel):
@@ -60,6 +60,7 @@ class ScrapeResult(BaseModel):
     """Produced after actually scraping"""
 
     url_hash: str
+    part_date: date
     source_url: str
     status_code: int
     scraped_len: int
@@ -95,7 +96,9 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
 
     # gdelt_data = sample_data(typ, rel_dir= Path(f"last_1y_{typ}"),
     #                          start_date=start_date, end_date=end_date, fraction=fraction)
-    gdelt_data = get_most_heated_events_pandas(heat_date = start_date, top_k = 1)
+    gdelt_data = get_most_heated_events_pandas(heat_date = start_date,
+                                                ev_heat_table=EV_HEAT_TABLE,
+                                               top_k = 1)
     gdelt_data['pub_date'] = gdelt_data['heat_date'].astype(str)
 
     L.info("gdelt_data typ=%s has %d", typ, len(gdelt_data))
@@ -146,7 +149,10 @@ HEATED_EVENTS_SQL_TMPL = """
 """
 
 
-def get_most_heated_events_pandas(*, heat_date: date, top_k: int) -> pd.DataFrame:
+def get_most_heated_events_pandas(*,
+                                  ev_heat_table: str,
+                                  heat_date: date,
+                                  top_k: int) -> pd.DataFrame:
     """Get most top_k most significant events for each geo_zone
 
     Returns
@@ -154,7 +160,7 @@ def get_most_heated_events_pandas(*, heat_date: date, top_k: int) -> pd.DataFram
         DataFrame with one row per event
 
     """
-    query_sql = HEATED_EVENTS_SQL_TMPL.format(heat_table=EV_HEAT_TABLE,
+    query_sql = HEATED_EVENTS_SQL_TMPL.format(heat_table=ev_heat_table,
                                               heat_date=heat_date,
                                               top_k=top_k)
 
@@ -224,7 +230,10 @@ def run_scraping(batch_size: int, limit: int = 1000) -> None:
 
     # %%
 def get_most_heated_events_spark(spark: SparkSession, *,
-                                 heat_date: date, top_k: int) -> ps.DataFrame:
+                                 ev_heat_table: str,
+                                 start_date: date,
+                                 end_date: date,
+                                 top_k: int) -> ps.DataFrame:
     """Get most top_k most significant events for each geo_zone
 
     Returns
@@ -232,7 +241,9 @@ def get_most_heated_events_spark(spark: SparkSession, *,
         DataFrame with one row per unique url
 
     """
-    query = HEATED_EVENTS_SQL_TMPL.format(heat_table=EV_HEAT_TABLE, heat_date=heat_date,
+    query = HEATED_EVENTS_SQL_TMPL.format(heat_table=ev_heat_table,
+                                          start_date=start_date,
+                                          end_date=end_date,
                                           top_k=top_k)
     query_result_df = spark.sql(query).drop_duplicates(["source_url"])
     gen_url_hash_udf = udf(gen_url_hash)
@@ -257,6 +268,7 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
     """Scrape a single record"""
     source_url = record['source_url']
     url_hash = record['url_hash']
+    part_date = record['part_date']
 
     L.info('Working on url=%r use_cache=%r', source_url, use_cache)
     resp_res= get_from_s3_or_request(source_url, url_hash, use_cache=use_cache)
@@ -272,6 +284,7 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
         scraped_text_len = 0
 
     result = ScrapeResult(url_hash=url_hash,
+                          part_date=record['part_date'],
                          source_url=source_url,
                          status_code=resp_res.status_code,
                          scraped_len=scraped_len,

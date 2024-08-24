@@ -1,5 +1,5 @@
 # Databricks notebook source
-! pip install -r ../requirements.txt
+# MAGIC %pip install -r ../requirements.txt
 
 # COMMAND ----------
 
@@ -12,7 +12,9 @@ import sys
 import zipfile
 import io
 # instead of export PYTHONPATH='./'
-sys.path.append("/Workspace/Repos/rojas.f.adrian@gmail.com/factored-datathon-2024-sinapsis")
+# COMMENT from Teo: changed this to actually point to same repo where this notebook resides
+# OLD VERSION: sys.path.append("/Workspace/Repos/rojas.f.adrian@gmail.com/factored-datathon-2024-sinapsis")
+sys.path.append("../")
 from data_proc.widget_helper import *
 from data_proc.delta_tables_helper import DeltaTableHelper
 from data_proc.common import GdeltV1Type
@@ -149,5 +151,3 @@ if response_dfs:
     # update checkpoint table with new files
     new_files.write.mode("append").partitionBy("event_type").saveAsTable("gdelt.bronze_scraping_checkpoints")
 
-
-# COMMAND ----------

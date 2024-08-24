@@ -1,42 +1,69 @@
+"""Databricks script for scraping of most heated events"""
 # Databricks notebook source
 # MAGIC
 # MAGIC %pip install -r ../requirements.txt
-# MAGIC """Databricks script for scraping of most heated events"""
+
+# COMMAND ----------
+import sys
+from importlib import reload
+from pathlib import Path
 
 # COMMAND ----------
 
 import logging
 from collections.abc import Iterable
 from datetime import date
-from importlib import reload
 
 import pandas as pd
-from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
+
+print("CWD:", Path.cwd())
+sys.path.append("../")
+import data_proc.common as com
+import data_proc.job_helper as jh
 import data_proc.news.scraping as scr
 
 reload(scr)
+reload(com)
+reload(jh)
 
-logging.getLogger().setLevel("WARN")
-
+# creating aliases to avoid undefined name errors from ruff
+# noinspection PyUnboundLocalVariable
+spark = spark_ = spark   # noqa: F821, PLW0127   # type: ignore [name-defined]
 
 # COMMAND ----------
 
-# creating aliases to avoid undefined name errors from ruff
-spark_ = spark  # noqa: F821   # type: ignore [name-defined]
-display_ = display # noqa: F821  # type: ignore [name-defined]
+logging.getLogger().setLevel("WARN")
 
-heat_date = date(2023, 8, 10)
-top_k = 3
+# COMMAND ----------
+
+help(scr.get_most_heated_events_spark)
+
+# COMMAND ----------
+
+
+# heat_date = get_param_or_default(spark, " date(2023, 8, 10)
+start_date = jh.get_param_or_default(spark, "start_date", date(2023, 8, 23), com.try_parse_date)
+end_date = jh.get_param_or_default(spark, "end_date", date(2023, 8, 23), com.try_parse_date)
+lookback_days = jh.get_param_or_default(spark, "lookback_days", 1, int)
+ev_heat_table = jh.get_param_or_default(spark, "ev_heat_table", "heat_indicator_by_event_dummy_teo")
+top_k = jh.get_param_or_default(spark,  "top_k", 1, int)
+
+start_date, end_date = jh.get_date_range_from_values(start_date, end_date, lookback_days)
+
+print("params:", {"start_date": start_date, "end_date": end_date,
+                  "ev_heat_table": ev_heat_table, "top_k": top_k})
 
 heated_events = scr.get_most_heated_events_spark(spark_,
-                                             heat_date=heat_date,
+                                             ev_heat_table=ev_heat_table,
+                                             start_date=start_date,
+                                             end_date=end_date,
                                              top_k=top_k)
 
 # COMMAND ----------
 
-display_(heated_events.limit(100))
+heated_events.limit(100).display()
 
 # COMMAND ----------
 
@@ -50,7 +77,7 @@ def _scrape_from_df_iter(pd_dfs: Iterable[pd.DataFrame]) -> Iterable[pd.DataFram
 
 # COMMAND ----------
 
-results_table = spark_.table("gdelt.scraping_results")
+results_table = spark.table("gdelt.scraping_results")
 print(results_table.schema)
 results_table.limit(10).collect()
 
@@ -67,14 +94,13 @@ scrape_result_schema = StructType([
     StructField('request_err', StringType(), True),
     StructField('part_date', DateType(), True)
 ])
-scrape_results = (heated_events
-                  .mapInPandas(_scrape_from_df_iter, schema=scrape_result_schema)
-                  .withColumn('part_date', F.lit(heat_date))
-            )
+
+scrape_results = heated_events.mapInPandas(_scrape_from_df_iter,
+                                           schema=scrape_result_schema)
 
 # COMMAND ----------
 
-display_(scrape_results.limit(10))
+scrape_results.limit(10).display()
 
 # COMMAND ----------
 
@@ -84,6 +110,6 @@ spark_.sql("refresh table gdelt.scraping_results")
 
 (scrape_results
     .write.mode("overwrite")
-    .option("replaceWhere", f"part_date == '{heat_date}'")
+    .option("replaceWhere", f"part_date >= '{start_date} and part_date <= '{end_date}'")
     .partitionBy("part_date")
     .saveAsTable("gdelt.scraping_results"))

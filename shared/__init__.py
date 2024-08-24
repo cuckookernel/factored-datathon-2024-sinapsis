@@ -63,7 +63,9 @@ def assert_some(val: T_ | None) -> T_:
 
 def assert_type(val: object, typ_: type[T_]) -> T_:
     """Assert type of something"""
-    assert isinstance(val, typ_), f"Expected type: {typ_}, found: `{type(val)}`, val={val!r}" # noqa: S101
+    if not isinstance(val, typ_):
+        raise TypeError(f"Expected type: {typ_}, found: `{type(val)}`, val={val!r}")
+
     return val
 
 def assert_type_or_none(val: object, typ_: type[T_]) -> T_ | None:
