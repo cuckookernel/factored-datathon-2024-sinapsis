@@ -1,6 +1,5 @@
-"""Databricks script for scraping of most heated events"""
 # Databricks notebook source
-# MAGIC
+
 # MAGIC %pip install -r ../requirements.txt
 
 # COMMAND ----------
