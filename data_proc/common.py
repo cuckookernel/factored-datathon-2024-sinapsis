@@ -3,6 +3,7 @@ import os
 from datetime import timezone
 from pathlib import Path
 from typing import Literal, Optional, TypeAlias
+from datetime import date
 
 NaN = float("nan")
 UTC = timezone.utc
@@ -53,5 +54,15 @@ def gdelt_base_data_path(data_dir: Optional[str] = None) -> Path:
 # %%
 def suffix_for_typ(typ: GdeltV1Type) -> str:
     """Return the suffix used in files for a given type"""
+
+
+def try_parse_date(a_str: str) -> date | None:
+    """Try converting a_str to a date. If it fails, return None."""
+    try:
+        return date.fromisoformat(a_str)
+    except ValueError:
+        return None
+
+
     return "export" if typ == "events" else typ
 # %%

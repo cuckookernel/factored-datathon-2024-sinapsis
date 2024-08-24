@@ -39,7 +39,7 @@ REQ_HEADERS = {
 
 L = logging.getLogger('extraction')
 
-EV_HEAT_TABLE = "gdelt.heat_indicator_by_event_dummy_teo"
+# EV_HEAT_TABLE = "gdelt.heat_indicator_by_event_dummy_teo"
 # %%
 
 class ScrapeWish(BaseModel):
@@ -224,7 +224,10 @@ def run_scraping(batch_size: int, limit: int = 1000) -> None:
 
     # %%
 def get_most_heated_events_spark(spark: SparkSession, *,
-                                 heat_date: date, top_k: int) -> ps.DataFrame:
+                                 ev_heat_table: str,
+                                 start_date: date, 
+                                 end_date: date,
+                                 top_k: int) -> ps.DataFrame:
     """Get most top_k most significant events for each geo_zone
 
     Returns
@@ -232,7 +235,9 @@ def get_most_heated_events_spark(spark: SparkSession, *,
         DataFrame with one row per unique url
 
     """
-    query = HEATED_EVENTS_SQL_TMPL.format(heat_table=EV_HEAT_TABLE, heat_date=heat_date,
+    query = HEATED_EVENTS_SQL_TMPL.format(heat_table=ev_heat_table, 
+                                          start_date=start_date,                                          
+                                          end_date=end_date,
                                           top_k=top_k)
     query_result_df = spark.sql(query).drop_duplicates(["source_url"])
     gen_url_hash_udf = udf(gen_url_hash)
