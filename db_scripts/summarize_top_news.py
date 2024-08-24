@@ -3,7 +3,7 @@
 
 # COMMAND ----------
 
-dbutils.library.restartPython()
+# dbutils.library.restartPython()
 
 
 # COMMAND ----------
@@ -25,6 +25,9 @@ from pyspark.sql.types import BooleanType, DateType, Row, StringType, StructFiel
 from data_proc.news.labeling import GROQ_DEFAULT_MODEL, remove_indentation
 from shared import assert_type
 
+spark = spark # noqa: F821, PLW0127
+dbutils = dbutils # noqa: F821, PLW0127
+
 SUMMARIZE_LLM_TMPL = """
     Please summarize the following piece of news in no more than 50 words:
     ```
@@ -39,6 +42,7 @@ LLMReqParams: TypeAlias = dict[str, str | int | None]
 
 
 def n_grok_api_keys() -> int:
+    """Get number of grok available API keys"""
     return len(os.environ["GROQ_API_KEYS"].split(";"))
 
 @dataclass
@@ -116,7 +120,7 @@ def summarize_one_with_grok(*,
     client = Groq(api_key=api_key)
 
     truncation_len=llm_req_params["input_trunc_len"]
-    news_text_trunc = news_text[:]
+    news_text_trunc = news_text[:truncation_len]
     prompt = remove_indentation(prompt_tmpl.format(news_text=news_text_trunc))
     result = SummarizeResult(ext_id=ext_id,
                              part_date=part_date,
@@ -147,7 +151,8 @@ def summarize_one_with_grok(*,
 
 # COMMAND ----------
 
-res =  SummarizeResult(ext_id='adasd', summary=None, model='a', prompt='b', error_msg=None, success=False, llm_req_params={}, part_date=date(2013, 1, 1))
+res =  SummarizeResult(ext_id='adasd', summary=None, model='a', prompt='b', error_msg=None,
+                       success=False, llm_req_params={}, part_date=date(2013, 1, 1))
 res_to_dict(res)
 
 
@@ -158,12 +163,13 @@ part_date_end = date(2023, 8, 12)
 
 # COMMAND ----------
 
-sdf: ps.DataFrame = spark.sql(f"""select * 
-        from gdelt.scraping_results
-        where scraped_text is not Null 
-        and part_date >= '{part_date_start}'
-        and part_date <= '{part_date_end}'
-    """)
+sdf: ps.DataFrame = spark.sql(f"""select *
+                                from gdelt.scraping_results
+                                where scraped_text is not null
+                                and part_date >= '{part_date_start}'
+                                and part_date <= '{part_date_end}'
+                                """ # noqa: S608
+                              )
 sdf = sdf.repartition(numPartitions=n_grok_api_keys()).cache()
 
 sdf.limit(30).display()
@@ -205,5 +211,3 @@ summaries_df.limit(10).display()
 
 
 # COMMAND ----------
-
-

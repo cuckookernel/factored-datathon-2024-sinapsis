@@ -14,9 +14,9 @@ from pyspark.sql.types import DateType, LongType, StringType, StructField, Struc
 
 print("CWD:", Path.cwd())
 sys.path.append("../")
-import data_proc.common as com  # noqa: E402
-import data_proc.job_helper as jh  # noqa: E402
-import data_proc.news.scraping as scr  # noqa: E402
+import data_proc.common as com
+import data_proc.job_helper as jh
+import data_proc.news.scraping as scr
 
 reload(scr)
 reload(com)
