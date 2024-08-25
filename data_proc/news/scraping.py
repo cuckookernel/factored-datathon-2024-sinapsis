@@ -135,18 +135,29 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
 
 
 HEATED_EVENTS_SQL_TMPL = """
-    with pre as (
+    with pre0 as (        
         select
             *,
-            row_number() over (partition by geo_zone order by ev_heat desc) as rank
+            row_number() over (
+                partition by date_added, geo_zone, source_url
+                order by heat_indicator desc
+            ) as rank_per_url
         from {heat_table}
         where
-            heat_date >= '{start_date}'
-            and heat_date <= '{end_date}'
+            date_added >= '{start_date}'
+            and date_added <= '{end_date}'
             and country_code is not null and geo_zone is not null and geo_zone != ''
+    ),
+    pre as (
+        select *, row_number() over (
+            partition by date_added, geo_zone
+            order by heat_indicator desc
+        ) as heat_rank
+        from pre0 
+        where rank_per_url = 1
     )
     select * from pre
-        where rank <= {top_k}
+        where heat_rank <= {top_k}
 """
 
 
@@ -168,7 +179,7 @@ def get_most_heated_events_pandas(*,
     from shared.databricks_conn import run_query
     ret_df = run_query(query_sql)
     ret_df['url_hash'] = ret_df['source_url'].apply(gen_url_hash)
-    ret_df['heat_date'] = heat_date
+    ret_df['date_added'] = heat_date
 
     return ret_df
 

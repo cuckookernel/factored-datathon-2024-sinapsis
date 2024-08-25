@@ -1,5 +1,6 @@
 # Databricks notebook source
 # MAGIC %pip install -r ../requirements.txt
+# MAGIC %pip install ../   # install data_proc and shared modules directly from our repo source
 
 # COMMAND ----------
 
@@ -13,13 +14,13 @@ from pathlib import Path
 import pandas as pd
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
-print("CWD:", Path.cwd())
-sys.path.append("../")
 import data_proc.common as com
 import data_proc.job_helper as jh
 import data_proc.news.scraping as scr
 
-reload(scr)
+from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
+
+
 reload(com)
 reload(jh)
 
@@ -30,29 +31,22 @@ logging.getLogger().setLevel("WARN")
 
 # COMMAND ----------
 
-print(scr.HEATED_EVENTS_SQL_TMPL)
-
-# COMMAND ----------
-
 # heat_date = get_param_or_default(spark, " date(2023, 8, 10)
-start_date = jh.get_param_or_default(spark, "start_date", date(2023, 8, 23), com.try_parse_date)
-end_date = jh.get_param_or_default(spark, "end_date", date(2023, 8, 23), com.try_parse_date)
-lookback_days = jh.get_param_or_default(spark, "lookback_days", 1, int)
+set_up_date_range_widgets(spark)
+start_date, end_date = get_date_range(spark)
 ev_heat_table = jh.get_param_or_default(spark, "ev_heat_table",
-                                        "gdelt.heat_indicator_by_event_dummy_teo")
+                                        "gdelt.heat_indicator_by_event")
 top_k = jh.get_param_or_default(spark,  "top_k", 1, int)
-
-start_date, end_date = jh.get_date_range_from_values(start_date, end_date, lookback_days)
 
 print("params:", {"start_date": start_date, "end_date": end_date,
                   "ev_heat_table": ev_heat_table, "top_k": top_k})
-
+reload(scr)
 top_news_events = scr.get_most_heated_events_spark(
-            spark,
-            ev_heat_table=ev_heat_table,
-            start_date=start_date,
-            end_date=end_date,
-            top_k=top_k
+    spark,
+    ev_heat_table=ev_heat_table,
+    start_date=start_date,
+    end_date=end_date,
+    top_k=top_k
 ).cache()
 
 # COMMAND ----------
@@ -89,7 +83,7 @@ scrape_results = top_news_events.withColumnRenamed("heat_date", "part_date").map
 
 # COMMAND ----------
 
-scrape_results.limit(10).display()
+scrape_results.cache().limit(10).display()
 
 # COMMAND ----------
 
@@ -102,5 +96,3 @@ spark.sql("refresh table gdelt.scraping_results")
     .option("replaceWhere", f"part_date >= '{start_date}' and part_date <= '{end_date}'")
     .partitionBy("part_date")
     .saveAsTable("gdelt.scraping_results"))
-
-# COMMAND ----------
