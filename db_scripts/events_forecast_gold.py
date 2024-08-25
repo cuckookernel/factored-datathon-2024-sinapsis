@@ -29,30 +29,25 @@ heat_geo_df = spark.read.table("gdelt.heat_indicator_by_date_location").where(F.
 
 # Get distinct dates and countries
 dates = heat_geo_df.select("indicator_date").distinct()
-zones = heat_geo_df.select("geo_zone", "country_code", "country").distinct()
+countries = heat_geo_df.select("country_code", "country").distinct()
 
 # Cross join dates and countries to create a DataFrame with all combinations
-complete_combinations = dates.crossJoin(zones)
+complete_combinations = dates.crossJoin(countries)
 
 # COMMAND ----------
 
 final_df = complete_combinations.alias("complete") \
     .join(heat_geo_df.alias("original"), 
           (F.col("complete.indicator_date") == F.col("original.indicator_date")) & 
-          (F.col("complete.geo_zone") == F.col("original.geo_zone")),
+          (F.col("complete.country_code") == F.col("original.country_code")),
           how="left") \
     .select(
         F.col("complete.indicator_date"),
-        F.col("complete.geo_zone"),
          F.col("complete.country_code"),
         F.col("complete.country"),
         F.coalesce(F.col("original.heat_indicator"), F.lit(0)).alias("heat_indicator"),
         F.coalesce(F.col("original.frequency"), F.lit(0)).alias("frequency"),
     )
-
-# COMMAND ----------
-
-final_df.select('country_code').distinct().count()
 
 # COMMAND ----------
 
@@ -79,7 +74,7 @@ spark_predictions_df = spark.createDataFrame(predictions)
 
 # COMMAND ----------
 
-final_predictions_df = zones.alias("complete") \
+final_predictions_df = countries.alias("complete") \
     .join(spark_predictions_df.alias("original"), 
           (F.col("complete.country_code") == F.col("original.country_code")),
           how="inner") \
