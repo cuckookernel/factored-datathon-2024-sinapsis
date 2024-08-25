@@ -207,7 +207,7 @@ def _interactive_testing() -> None:
     db.close()
     # %%
 
-def run_scraping(batch_size: int, limit: int = 1000) -> None:
+def run_scraping_pandas(batch_size: int, limit: int = 1000) -> None:
     """Run scraping and text extraction of yet unscraped urls"""
     # %%
     db = get_scraping_db()
