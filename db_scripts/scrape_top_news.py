@@ -98,7 +98,7 @@ scrape_result_schema = StructType([
     StructField('part_date', DateType(), True)
 ])
 
-scrape_results = (
+scraping_results = (
     top_news_events
     .mapInPandas(
         _scrape_from_df_iter,
@@ -108,7 +108,7 @@ scrape_results = (
 
 # COMMAND ----------
 
-(scrape_results
+(scraping_results
    .groupby("part_date")
    .agg(F.count(F.col("source_url")))
 ).show()
@@ -123,14 +123,14 @@ from datetime import date
 
 output_table = "gdelt.scraping_results"
 
-actual_date_range = scrape_results.agg(F.min(F.col("part_date")).alias("min_date"),  
+actual_date_range = scraping_results.agg(F.min(F.col("part_date")).alias("min_date"),  
                                          F.max(F.col("part_date")).alias("max_date")
                     ).collect()
 actual_date_range_row = actual_date_range[0]
 print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")
 
 spark.sql(f"delete from {output_table} where part_date >= '{actual_date_range_row.min_date}' AND part_date <= '{actual_date_range_row.max_date}'")
-(actual_date_range
+(scraping_results
     .write
     .mode("append")
     .partitionBy("part_date")    
