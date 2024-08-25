@@ -9,6 +9,7 @@ click==8.1.7 # CLI construction
 dataset==1.6.2
 deflate==0.7.0
 mypy==1.11.1  # static type checking for better quality code
+typing_extensions==4.8.0
 pandas==2.2.2
 pandas-stubs~=2.2.2
 pyarrow==17.0.0

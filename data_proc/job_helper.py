@@ -31,7 +31,7 @@ def get_param_or_default(
     except Py4JJavaError as err:
         L.warning(f"dbutils.widgets.get({param_name!r}) failed with Py4JJavaError: {err.args[0]}. "
                   f"Returning default={default!r}")
-        return None
+        return default
 
     if param_val_str == "" or param_val_str is None:
         return default
