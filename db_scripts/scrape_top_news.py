@@ -3,16 +3,19 @@
 
 # COMMAND ----------
 
-# MAGIC %ls
+# %ls
+# %ls ../
+%pip install -r ../requirements.txt
+# %pip install ../   # install data_proc and shared modules directly from our repo source
 
 # COMMAND ----------
 
-# MAGIC %ls ../
+# %pip install ../ -t /local_disk0/.ephemeral_nfs/cluster_libraries/python/lib/python3.11/site-packages
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../requirements.txt
-# MAGIC # %pip install ../   # install data_proc and shared modules directly from our repo source
+import sys
+sys.path
 
 # COMMAND ----------
 
@@ -24,6 +27,7 @@ from importlib import reload
 from pathlib import Path
 
 import pandas as pd
+import pyspark.sql.functions as F
 from pyspark.sql.types import DateType, LongType, StringType, StructField, StructType
 
 import data_proc.common as com
@@ -32,15 +36,16 @@ import data_proc.news.scraping as scr
 
 from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
 
-print(com.__file__)
+print("data_proc.common at: ", com.__file__)
 reload(scr)
 reload(com)
 reload(jh)
 
+logging.getLogger().setLevel("WARN")
 # creating aliases to avoid undefined name errors from ruff
 # noinspection PyUnboundLocalVariable
 spark = spark_ = spark   # noqa: F821, PLW0127   # type: ignore [name-defined]
-logging.getLogger().setLevel("WARN")
+
 
 # COMMAND ----------
 
@@ -61,6 +66,10 @@ top_news_events = scr.get_most_heated_events_spark(
     end_date=end_date,
     top_k=top_k
 ).cache()
+
+# COMMAND ----------
+
+top_news_events.cache().groupby("date_added").agg(F.count("ev_id")).show()
 
 # COMMAND ----------
 
@@ -89,18 +98,20 @@ scrape_result_schema = StructType([
     StructField('part_date', DateType(), True)
 ])
 
-scrape_results = top_news_events.withColumnRenamed("date_added", "part_date").mapInPandas(
-    _scrape_from_df_iter,
-    schema=scrape_result_schema
+scraping_results = (
+    top_news_events
+    .mapInPandas(
+        _scrape_from_df_iter,
+        schema=scrape_result_schema
+    )
 ).cache()
 
 # COMMAND ----------
 
-scrape_results.cache().limit(10).display()
-
-# COMMAND ----------
-
-scrape_results.groupby("part_date").agg({"source_url": "count"}).collect()
+(scraping_results
+   .groupby("part_date")
+   .agg(F.count(F.col("source_url")))
+).show()
 
 # COMMAND ----------
 
@@ -108,8 +119,23 @@ spark.sql("refresh table gdelt.scraping_results")
 
 # COMMAND ----------
 
-(scrape_results
-    .write.mode("overwrite")
-    .option("replaceWhere", f"part_date >= '{start_date}' and part_date <= '{end_date}'")
-    .partitionBy("part_date")
-    .saveAsTable("gdelt.scraping_results"))
+from datetime import date
+
+output_table = "gdelt.scraping_results"
+
+actual_date_range = scraping_results.agg(F.min(F.col("part_date")).alias("min_date"),  
+                                         F.max(F.col("part_date")).alias("max_date")
+                    ).collect()
+actual_date_range_row = actual_date_range[0]
+print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")
+
+spark.sql(f"delete from {output_table} where part_date >= '{actual_date_range_row.min_date}' AND part_date <= '{actual_date_range_row.max_date}'")
+(scraping_results
+    .write
+    .mode("append")
+    .partitionBy("part_date")    
+    .saveAsTable(output_table))
+
+# COMMAND ----------
+
+
