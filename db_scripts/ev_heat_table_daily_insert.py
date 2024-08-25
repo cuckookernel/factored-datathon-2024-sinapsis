@@ -28,8 +28,8 @@ ln100 = math.log(100)
 
 events_w_heat_sf = (
     spark.read.table("gdelt.silver_events")
-    .where(col("date_added").between(start_date, end_date)           
-    )
+    .where(col("date_added")
+           .between(start_date, end_date))
     .select("date_added",
             "ev_id",
             "ev_date",     
@@ -54,7 +54,8 @@ events_w_heat_sf = (
             "ev_desc",
     )
     .withColumnRenamed("action_geo_country_code", "country_code")
-    .withColumnRenamed("action_geo_country", "country_code")
+    .withColumnRenamed("action_geo_country", "country")
+    .withColumnRenamed("action_geo_state", "state")
     .withColumnRenamed("action_geo_lat", "lat")
     .withColumnRenamed("action_geo_lon", "lon")
     .withColumnRenamed("ev_date", "indicator_date")
@@ -70,11 +71,10 @@ events_w_heat_sf = (
     .filter(col("country_code").isNotNull() & (col("country_code") != lit("")))
     .withColumn("geo_zone",
                 when(col("country_code").isin(["US", "CH", "RS", "IN", "BR"])
-                     & col("action_geo_state").isNotNull()
-                     & (col("action_geo_state") != col("action_geo_country")),
-                     concat(col("action_geo_country"), lit(" / "), col("action_geo_state"))
+                     & col("state").isNotNull() & (col("state") != col("country")),
+                     concat(col("country"), lit(" / "), col("state"))
                      )
-                .otherwise(col("action_geo_country"))
+                .otherwise(col("country"))
     )  # geo_zone
 ) # events_w_heat_sf
 
@@ -91,7 +91,7 @@ spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_event")
 (events_w_heat_sf
     .write.mode("overwrite")
     .partitionBy("date_added")
-     .option("replaceWhere", f"date_added >= '{start_date}' AND date_added <= '{end_date}'")
+    .option("replaceWhere", f"date_added >= '{start_date}' AND date_added <= '{end_date}'")
     .saveAsTable("gdelt.heat_indicator_by_event"))
 
 # COMMAND ----------
@@ -105,11 +105,13 @@ heat_by_geo_zone = (
     spark.read.table("gdelt.heat_indicator_by_event")
        .withColumn("log_num_mentions", log(1 + col("num_mentions")))
        .withColumn("weighted_heat", col("heat_indicator") * col("log_num_mentions"))
-       .groupBy("indicator_date", "country_code", "action_geo_state", "geo_zone")
+       .groupBy("indicator_date", "country_code", "state", "geo_zone")
        .agg(
-            count(col("ev_id"))             .alias("event_cnt"),
+            count(col("ev_id"))             .alias("frequency"),
             F.sum(col("weighted_heat"))     .alias("sum_weighted_heat"),
-            F.sum(col("log_num_mentions"))  .alias("sum_log_num_mentions")         
+            F.sum(col("log_num_mentions"))  .alias("sum_log_num_mentions"),
+            F.median(col("lat"))            .alias("lat"),
+            F.median(col("lon"))            .alias("lon")
         ) # agg
        .withColumn("heat_indicator", 
                    col("sum_weighted_heat") / col("sum_log_num_mentions"))
@@ -120,8 +122,12 @@ heat_by_geo_zone = (
 
 # COMMAND ----------
 
-heat_by_geo_zone.sort("indicator_date", "geo_zone").limit(2000).display()
+# heat_by_geo_zone.sort("indicator_date", "geo_zone").limit(100).display()
 
 # COMMAND ----------
 
-
+(heat_by_geo_zone
+ .write.mode("overwrite")
+ .partitionBy("indicator_date")
+ .saveAsTable("gdelt.heat_indicator_by_date_location")
+)
