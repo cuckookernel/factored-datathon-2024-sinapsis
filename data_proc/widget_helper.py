@@ -24,7 +24,7 @@ def get_date_range(spark: SparkSession) -> tuple[date, date]:
     dbutils = DBUtils(spark)
     start_date = dbutils.widgets.get("start_date")
     end_date = dbutils.widgets.get("end_date")
-    lookback_days = int(dbutils.widgets.get("lookback_days"))
+    lookback_days = dbutils.widgets.get("lookback_days")
 
     print(f"get_date_range: start_date: {start_date!r}, end_date: {end_date!r}, lookback_days: {lookback_days!r}")
 
