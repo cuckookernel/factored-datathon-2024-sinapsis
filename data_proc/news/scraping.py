@@ -96,9 +96,11 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
 
     # gdelt_data = sample_data(typ, rel_dir= Path(f"last_1y_{typ}"),
     #                          start_date=start_date, end_date=end_date, fraction=fraction)
-    gdelt_data = get_most_heated_events_pandas(heat_date = start_date,
-                                               ev_heat_table="gdelt.heat_indicator_by_event_dummy_teo",
-                                               top_k = 1)
+    gdelt_data = get_most_heated_events_pandas(
+        heat_date = start_date,
+        ev_heat_table="gdelt.heat_indicator_by_event_dummy_teo",
+        top_k = 1
+    )
     gdelt_data['pub_date'] = gdelt_data['heat_date'].astype(str)
 
     L.info("gdelt_data typ=%s has %d", typ, len(gdelt_data))
@@ -137,6 +139,7 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
 HEATED_EVENTS_SQL_TMPL = """
     with pre as (
         select
+            
             *,
             row_number() over (partition by geo_zone order by ev_heat desc) as rank
         from {heat_table}
@@ -269,7 +272,7 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
     """Scrape a single record"""
     source_url = record['source_url']
     url_hash = record['url_hash']
-    part_date = record['part_date']
+    part_date = record['date_added']
 
     L.info('Working on url=%r use_cache=%r', source_url, use_cache)
     resp_res= get_from_s3_or_request(source_url, url_hash, use_cache=use_cache)
