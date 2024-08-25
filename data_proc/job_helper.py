@@ -29,14 +29,14 @@ def get_param_or_default(
     try:
         param_val_str = dbutils.widgets.get(param_name)
     except Py4JJavaError as err:
-        L.warning(f"dbutils.widgets.get({param_name!r}) failed with Py4JJavaError: {err.args[0]}."
+        L.warning(f"dbutils.widgets.get({param_name!r}) failed with Py4JJavaError: {err.args[0]}. "
                   f"Returning default={default!r}")
-        return default
+        return None
 
     if param_val_str == "" or param_val_str is None:
         return default
     else:
-        print("Got param value from widget or job param  `{param_name}`='{param_val_str}'")
+        print(f"Got param value from widget or job param  `{param_name}`='{param_val_str}'")
         if converter is not None:
             try:
                 return assert_type(converter(param_val_str), type(default))
@@ -62,7 +62,7 @@ def get_param(
         param_val_str = None
 
     if param_val_str == "" or param_val_str is None:
-       raise RuntimeError(f"No value for param `{param_name}")
+       raise RuntimeError(f"No value for param `{param_name}`")
 
     print(f"Got param value from widget or job param  `{param_name}`='{param_val_str}'")
     if converter is not None:
