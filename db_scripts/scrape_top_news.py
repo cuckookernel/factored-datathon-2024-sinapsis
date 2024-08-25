@@ -1,4 +1,16 @@
 # Databricks notebook source
+# MAGIC %pwd
+
+# COMMAND ----------
+
+# MAGIC %ls
+
+# COMMAND ----------
+
+# MAGIC %ls ../
+
+# COMMAND ----------
+
 # MAGIC %pip install -r ../requirements.txt
 # MAGIC %pip install ../   # install data_proc and shared modules directly from our repo source
 
@@ -85,6 +97,10 @@ scrape_results = top_news_events.withColumnRenamed("date_added", "part_date").ma
 # COMMAND ----------
 
 scrape_results.cache().limit(10).display()
+
+# COMMAND ----------
+
+scrape_results.groupby("part_date").agg({"source_url": "count"}).collect()
 
 # COMMAND ----------
 
