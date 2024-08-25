@@ -105,7 +105,9 @@ heat_by_geo_zone = (
     spark.read.table("gdelt.heat_indicator_by_event")
        .withColumn("log_num_mentions", log(1 + col("num_mentions")))
        .withColumn("weighted_heat", col("heat_indicator") * col("log_num_mentions"))
-       .groupBy("indicator_date", "country_code", "state", "geo_zone")
+    #   .groupBy("indicator_date", "country_code", "state", "geo_zone")
+    #    .groupBy("indicator_date", "country_code", "action_geo_state", "geo_zone")
+       .groupBy("indicator_date", "country", "geo_zone")
        .agg(
             count(col("ev_id"))             .alias("frequency"),
             F.sum(col("weighted_heat"))     .alias("sum_weighted_heat"),
