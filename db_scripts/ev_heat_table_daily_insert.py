@@ -104,7 +104,9 @@ actual_date_range = events_w_heat_sf.agg(F.min(col("date_added")).alias("min_dat
 actual_date_range_row = actual_date_range[0]
 print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")
 
-spark.sql(f"delete from {output_table} where date_added >= '{actual_date_range_row.min_date}' AND date_added <= '{actual_date_range_row.max_date}'")
+spark.sql(f"""delete from {output_table} "
+           where date_added >= '{actual_date_range_row.min_date}'
+           AND date_added <= '{actual_date_range_row.max_date}'""")
 (events_w_heat_sf
     .write
     .mode("append")
@@ -115,13 +117,10 @@ spark.sql(f"delete from {output_table} where date_added >= '{actual_date_range_r
 
 # IMPORTANT NO LONGER REGENARATING `heat_indicator_by_date_location` ON SPARK BECAUSE IT TAKES WAY TOO LONG 
 # We are doing this now by means of an sql query
-
 # import pyspark.sql.functions as F
 # from pyspark.sql.functions import log, count, col
-
 # As this increment may have added events with ev_date (-> inicator date) in the past, 
 # we need to recompute for ALL events, not just the increment
-
 # heat_by_geo_zone = (
 #    spark.read.table("gdelt.heat_indicator_by_event")
 # .withColumn("log_num_mentions", log(1 + col("num_mentions")))
@@ -129,36 +128,22 @@ spark.sql(f"delete from {output_table} where date_added >= '{actual_date_range_r
 #      .groupBy("indicator_date", "country_code", "country", "geo_zone")
       #  .groupBy("indicator_date", "country_code", "action_geo_state", "geo_zone")
       #  .groupBy("indicator_date", "country", "geo_zone")
- #      .agg(
- #           count(col("ev_id"))             .alias("frequency"),
- #           F.sum(col("weighted_heat"))     .alias("sum_weighted_heat"),
- #           F.sum(col("log_num_mentions"))  .alias("sum_log_num_mentions"),
- #           F.median(col("lat"))            .alias("lat"),
- #           F.median(col("lon"))            .alias("lon")
- #       ) # agg
- #      .withColumn("heat_indicator", 
- #                  col("sum_weighted_heat") / col("sum_log_num_mentions"))
- #      .drop("sum_weighted_heat", "sum_log_num_mentions")
+#      .agg(
+#           count(col("ev_id"))             .alias("frequency"),
+#           F.sum(col("weighted_heat"))     .alias("sum_weighted_heat"),
+#           F.sum(col("log_num_mentions"))  .alias("sum_log_num_mentions"),
+#           F.median(col("lat"))            .alias("lat"),
+#           F.median(col("lon"))            .alias("lon")
+#       ) # agg
+#      .withColumn("heat_indicator", 
+#                  col("sum_weighted_heat") / col("sum_log_num_mentions"))
+#      .drop("sum_weighted_heat", "sum_log_num_mentions")
 # )
-
+##### spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_date_location")
 # heat_by_geo_zone.cache().limit(10).show()
-
-# COMMAND ----------
-
-## heat_by_geo_zone.sort("indicator_date", "geo_zone").limit(100).display()
-# spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_date_location")
-
-# No longer doing this in
-
-# COMMAND ----------
-
-(heat_by_geo_zone
- .write
- .mode("overwrite")
- .partitionBy("indicator_date")
- .saveAsTable("gdelt.heat_indicator_by_date_location")
-)
-
-# COMMAND ----------
-
-
+# (heat_by_geo_zone
+# .write
+# .mode("overwrite")
+# .partitionBy("indicator_date")
+#  .saveAsTable("gdelt.heat_indicator_by_date_location")
+# )

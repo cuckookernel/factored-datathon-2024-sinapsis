@@ -6,6 +6,8 @@ from typing import TypeVar
 from py4j.protocol import Py4JJavaError
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
+import pyspark.sql as ss
+import pyspark.sql.functions as F
 
 from data_proc.widget_helper import TZ, today
 from shared import assert_type, logging
@@ -85,11 +87,6 @@ def get_date_range_from_values(start_date: date | None,
         start_date1: date = (datetime.now(tz=TZ) - timedelta(days=int(lookback_days))).date()
         return start_date1, end_date1
 
-
-import pyspark.sql as ss
-import pyspark.sql.functions as F
-
-
 def replace_range(spark: SparkSession,
                   data_sf: ss.DataFrame,
                   part_col: str,
@@ -113,7 +110,8 @@ def replace_range(spark: SparkSession,
     spark.sql(f"""
         delete from {dest_table}
               where {part_col} >= '{actual_min_date}'
-                AND {part_col} <= '{actual_max_date}'""")
+                AND {part_col} <= '{actual_max_date}'
+    """)
 
     (data_sf
      .write

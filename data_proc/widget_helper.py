@@ -24,7 +24,9 @@ def get_date_range(spark: SparkSession) -> tuple[date, date]:
     dbutils = DBUtils(spark)
     start_date = dbutils.widgets.get("start_date")
     end_date = dbutils.widgets.get("end_date")
-    lookback_days = dbutils.widgets.get("lookback_days")
+    lookback_days = int(dbutils.widgets.get("lookback_days"))
+
+    print(f"get_date_range: start_date: {start_date!r}, end_date: {end_date!r}, lookback_days: {lookback_days!r}")
 
     # if we got dates, use them else use current date
     if start_date and end_date:
@@ -32,9 +34,11 @@ def get_date_range(spark: SparkSession) -> tuple[date, date]:
         end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=TZ).date()
     # if we got lookback days, use it
     elif lookback_days:
-        start_date = (datetime.now(tz=TZ) - timedelta(days=int(lookback_days))).date()
-        end_date = today()
-    # else use default current date
+        start_time_tz = datetime.now(tz=TZ)
+        print("get_date_range: start_time_tz: {start_time_tz!r}")
+        start_date = (start_time_tz- timedelta(days=int(lookback_days))).date()
+        print("get_date_range: start_date: {start_date!r}")
+        end_date = today()    
     else:
         start_date = today()
         end_date = today()
