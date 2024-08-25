@@ -19,101 +19,44 @@ set_up_date_range_widgets(spark)
 start_date, end_date = get_date_range(spark)
 start_date_str, end_date_str = start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
-
-silver_events = DeltaTableHelper.SilverTables.Events
-
 # COMMAND ----------
 
-silver_events_df = spark.read.table(silver_events.table_name).where(
-    F.col("date_added").between(start_date, end_date)
-    & F.col("ev_root_code").isin(["13","14","18","20"])
-    # & (F.col("is_root_event") == True)
-    ).select("ev_id","ev_date", 
-                  "action_geo_country_code", "action_geo_country", "action_geo_state", "action_geo_location", "action_geo_id", "action_geo_type", "action_geo_lat", "action_geo_lon", "is_root_event", "ev_code","ev_desc","ev_base_code","ev_base_desc","ev_root_code","ev_root_desc","quad_class","quad_class_desc","gstein_scale","num_mentions","num_sources","num_articles","avg_tone","date_added","source_url")
+training_data_start_date = end_date - F.expr("INTERVAL 3 MONTHS")
 
-# COMMAND ----------
-
-silver_events_df.count()
-
-# COMMAND ----------
-
-silver_events_df = silver_events_df.withColumn("heat_indicator", 
-                                               ((F.col("gstein_scale") + F.col("avg_tone")) / 2) * F.col("num_mentions")
-                                               )
-
-# COMMAND ----------
-
-display(silver_events_df.select("action_geo_country_code", "action_geo_country").distinct().orderBy("action_geo_country"))
-
-# COMMAND ----------
-
-silver_events_df = silver_events_df.withColumn("geo_zone", F.when(F.col("action_geo_country_code").isin(["US", "CH", "BR", "IN", "IS", "RS", "UK"]), F.col("action_geo_state")).otherwise(F.col("action_geo_country")))
-
-# COMMAND ----------
-
-silver_events_grouped_df = silver_events_df.groupBy("ev_date", "geo_zone", F.col('action_geo_country').alias('country')
-                                                    ).agg(F.mean("heat_indicator").alias("heat_indicator"),
-                                                          F.median("action_geo_lat").alias("lat"),
-                                                          F.median("action_geo_lon").alias("lon"),
-                                                          F.count('*').alias("frequency")
-                                                          )
-
-# COMMAND ----------
-
-display(silver_events_grouped_df.limit(100))
-
-# COMMAND ----------
-
-silver_events_grouped_df = silver_events_grouped_df.filter(silver_events_grouped_df.geo_zone.isNotNull())
-
-# COMMAND ----------
-
-lat_lon_df = silver_events_grouped_df.groupBy("geo_zone").agg(F.median('lat').alias('lat'), F.median('lon').alias('lon'))
+heat_geo_df = spark.read.table("gdelt.heat_indicator_by_date_location").where(F.col("indicator_date") > training_data_start_date)
 
 # COMMAND ----------
 
 # Get distinct dates and countries
-dates = silver_events_grouped_df.select("ev_date").where(F.col("ev_date") > "2020-01-01").distinct()
-zones = silver_events_grouped_df.select("geo_zone", "country").where(F.col("ev_date") > "2020-01-01").distinct()
+dates = heat_geo_df.select("indicator_date").distinct()
+zones = heat_geo_df.select("geo_zone", "country_code", "country").distinct()
 
 # Cross join dates and countries to create a DataFrame with all combinations
-complete_combinations = dates.crossJoin(zones).join(lat_lon_df, "geo_zone")
-
-# Ensure that all combinations are present in the DataFrame
-complete_combinations = complete_combinations.withColumn("heat_indicator", F.lit(0))
-
-# COMMAND ----------
-
-complete_combinations.count()
+complete_combinations = dates.crossJoin(zones)
 
 # COMMAND ----------
 
 final_df = complete_combinations.alias("complete") \
-    .join(silver_events_grouped_df.alias("original"), 
-          (F.col("complete.ev_date") == F.col("original.ev_date")) & 
+    .join(heat_geo_df.alias("original"), 
+          (F.col("complete.indicator_date") == F.col("original.indicator_date")) & 
           (F.col("complete.geo_zone") == F.col("original.geo_zone")),
           how="left") \
     .select(
-        F.col("complete.ev_date").alias("indicator_date"),
+        F.col("complete.indicator_date"),
         F.col("complete.geo_zone"),
+         F.col("complete.country_code"),
         F.col("complete.country"),
         F.coalesce(F.col("original.heat_indicator"), F.lit(0)).alias("heat_indicator"),
         F.coalesce(F.col("original.frequency"), F.lit(0)).alias("frequency"),
-        F.col("complete.lat"),
-        F.col("complete.lon")
     )
 
 # COMMAND ----------
 
-display(final_df.orderBy("indicator_date").limit(200))
+final_df.select('country_code').distinct().count()
 
 # COMMAND ----------
 
-final_df.write.format("delta").mode("overwrite").partitionBy("indicator_date").saveAsTable("gdelt.heat_indicator_by_date_location")
-
-# COMMAND ----------
-
-display(final_df.select(F.col("geo_zone")).distinct())
+X_df = final_df.groupBy("indicator_date", "country_code", "country").agg(F.mean("heat_indicator").alias("heat_indicator"))
 
 # COMMAND ----------
 
@@ -123,20 +66,12 @@ display(final_df.select(F.col("geo_zone")).distinct())
 
 from diviner import GroupedProphet
 
-fit_df = final_df.withColumnRenamed("indicator_date", "ds").withColumnRenamed("heat_indicator", "y")
-model = GroupedProphet().fit(fit_df.toPandas(), group_key_columns=["geo_zone"])
+X_df = X_df.withColumnRenamed("indicator_date", "ds").withColumnRenamed("heat_indicator", "y")
+model = GroupedProphet().fit(X_df.toPandas(), group_key_columns=["country_code"]);
 
 # COMMAND ----------
 
-predictions = model.forecast(horizon=1, frequency="W")
-
-# COMMAND ----------
-
-print(predictions.columns)
-
-# COMMAND ----------
-
-print(predictions['yhat'])
+predictions = model.forecast(horizon=7, frequency="D")
 
 # COMMAND ----------
 
@@ -144,34 +79,19 @@ spark_predictions_df = spark.createDataFrame(predictions)
 
 # COMMAND ----------
 
-display(spark_predictions_df.limit(10))
-
-# COMMAND ----------
-
-spark_predictions_df.count()
-
-# COMMAND ----------
-
-geo_combinations = zones.join(lat_lon_df, "geo_zone")
-
-final_predictions_df = geo_combinations.alias("complete") \
+final_predictions_df = zones.alias("complete") \
     .join(spark_predictions_df.alias("original"), 
-          (F.col("complete.geo_zone") == F.col("original.geo_zone")),
+          (F.col("complete.country_code") == F.col("original.country_code")),
           how="inner") \
     .select(
         F.col("original.ds").alias("indicator_date"),
-        F.col("original.geo_zone"),
+        F.col("original.country_code"),
         F.col("complete.country"),
         F.col('original.yhat'),
         F.col('original.yhat_upper'),
         F.col('original.yhat_lower'),
-        F.col("complete.lat"),
-        F.col("complete.lon"),
+        F.lit(end_date).alias('date_predicted')
     )
-
-# COMMAND ----------
-
-display(final_predictions_df.limit(20))
 
 # COMMAND ----------
 
@@ -181,5 +101,6 @@ final_predictions_df = final_predictions_df.withColumn("indicator_date", F.col("
 
 (final_predictions_df
     .write.mode("overwrite")
-    .partitionBy("indicator_date")
+.option("replaceWhere", f"date_predicted = '{end_date}'")
+    .partitionBy("date_predicted")
     .saveAsTable("gdelt.heat_indicator_by_date_location_forecast_7d"))
