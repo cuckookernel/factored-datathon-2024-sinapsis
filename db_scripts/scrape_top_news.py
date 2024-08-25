@@ -10,6 +10,15 @@
 
 # COMMAND ----------
 
+# %pip install ../ -t /local_disk0/.ephemeral_nfs/cluster_libraries/python/lib/python3.11/site-packages
+
+# COMMAND ----------
+
+import sys
+sys.path
+
+# COMMAND ----------
+
 import logging
 import sys
 from collections.abc import Iterable
@@ -60,11 +69,11 @@ top_news_events = scr.get_most_heated_events_spark(
 
 # COMMAND ----------
 
-top_news_events.limit(100).display()
+top_news_events.cache().groupby("date_added").agg(F.count("ev_id")).show()
 
 # COMMAND ----------
 
-top_news_events.groupby("date_added").agg(F.count("ev_id")).show()
+top_news_events.limit(100).display()
 
 # COMMAND ----------
 
@@ -91,7 +100,6 @@ scrape_result_schema = StructType([
 
 scrape_results = (
     top_news_events
-    .withColumnRenamed("date_added", "part_date")
     .mapInPandas(
         _scrape_from_df_iter,
         schema=scrape_result_schema
@@ -115,8 +123,8 @@ from datetime import date
 
 output_table = "gdelt.scraping_results"
 
-actual_date_range = scrape_results.agg(F.min(F.col("date_added")).alias("min_date"),  
-                                         F.max(F.col("date_added")).alias("max_date")
+actual_date_range = scrape_results.agg(F.min(F.col("part_date")).alias("min_date"),  
+                                         F.max(F.col("part_date")).alias("max_date")
                     ).collect()
 actual_date_range_row = actual_date_range[0]
 print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")

@@ -138,8 +138,7 @@ def gen_scrape_wishlist(typ: GdeltV1Type,
 
 HEATED_EVENTS_SQL_TMPL = """
     with pre0 as (        
-        select
-            
+        select            
             *,
             row_number() over (
                 partition by date_added, geo_zone, source_url
@@ -293,7 +292,8 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
         try:
             decoded_content = _decode_content(resp_res.content, resp_res.content_encoding)
         except Exception as err:
-            L.exception("Error decoding content ({err!r}) resp_res.content={resp_res.content[:100!r}...")
+            L.exception(f"Error decoding content ({err!r}) resp_res.content={resp_res.content[:100]!r}..."
+                        f"source_url={source_url}")
             decoded_content = b''
         scraped_text = extract_text(decoded_content)
         scraped_text_len=len(scraped_text)
