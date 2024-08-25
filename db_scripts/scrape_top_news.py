@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 # MAGIC %pip install -r ../requirements.txt
-# MAGIC %pip install ../   # install data_proc and shared modules directly from our repo source
+# MAGIC # %pip install ../   # install data_proc and shared modules directly from our repo source
 
 # COMMAND ----------
 
