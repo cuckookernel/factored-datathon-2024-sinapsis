@@ -290,7 +290,11 @@ def scrape_one(record: Series, use_cache: bool = True) -> Series:
 
     if resp_res.is_success():
         scraped_len = len(resp_res.content)
-        decoded_content = _decode_content(resp_res.content, resp_res.content_encoding)
+        try:
+            decoded_content = _decode_content(resp_res.content, resp_res.content_encoding)
+        except Exception as err:
+            L.exception("Error decoding content ({err!r}) resp_res.content={resp_res.content[:100!r}...")
+            decoded_content = b''
         scraped_text = extract_text(decoded_content)
         scraped_text_len=len(scraped_text)
     else:
@@ -379,7 +383,11 @@ def _decode_content(content: bytes, encoding: str | None) -> bytes:
         L.warning(f"encoding={encoding!r} won't decompress, content={content[:50]!r}...")
         ret = content
     elif encoding == "deflate":
-        ret = deflate.gzip_decompress(content)
+        try:
+            ret = deflate.gzip_decompress(content)
+        except Exception as err: # noqa: BLE001
+            L.error(f"Deflate decompression failed: {err!r}")
+            raise
     elif encoding is not None and encoding.lower() == "utf-8":
         ret =  content
     else:

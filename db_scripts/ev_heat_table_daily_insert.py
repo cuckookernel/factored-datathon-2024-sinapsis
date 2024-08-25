@@ -3,13 +3,19 @@
 
 # COMMAND ----------
 
+import logging
+logging.getLogger().setLevel(logging.WARNING)
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, when, exp, concat, lit
 from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
+from data_proc.job_helper import get_param_or_default
+
 
 # COMMAND ----------
 
 set_up_date_range_widgets(spark)
+
+input_table = get_param_or_default(spark, "input_table", "gdelt.silver_events")
 
 start_date, end_date = get_date_range(spark)
 print(f"DATE_RANGE:: {start_date} - {end_date}")
@@ -27,7 +33,7 @@ ln100 = math.log(100)
                               # "20"] # Use conventional mass violence)
 
 events_w_heat_sf = (
-    spark.read.table("gdelt.silver_events")
+    spark.read.table(input_table)
     .where(col("date_added")
            .between(start_date, end_date))
     .select("date_added",
@@ -83,16 +89,27 @@ assert len(events_w_heat_sf.columns) == len(set(events_w_heat_sf.columns))
 
 # COMMAND ----------
 
-# events_w_heat_sf.cache().limit(10).display()
+events_w_heat_sf.groupby("date_added").count().show()
 # spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_event")
 
 # COMMAND ----------
 
+from datetime import date
+
+output_table = "gdelt.heat_indicator_by_event"
+
+actual_date_range = events_w_heat_sf.agg(F.min(col("date_added")).alias("min_date"),  
+                                         F.max(col("date_added")).alias("max_date")
+                    ).collect()
+actual_date_range_row = actual_date_range[0]
+print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")
+
+spark.sql(f"delete from {output_table} where date_added >= '{actual_date_range_row.min_date}' AND date_added <= '{actual_date_range_row.max_date}'")
 (events_w_heat_sf
-    .write.mode("overwrite")
-    .partitionBy("date_added")
-    .option("replaceWhere", f"date_added >= '{start_date}' AND date_added <= '{end_date}'")
-    .saveAsTable("gdelt.heat_indicator_by_event"))
+    .write
+    .mode("append")
+    .partitionBy("date_added")    
+    .saveAsTable(output_table))
 
 # COMMAND ----------
 
@@ -118,18 +135,18 @@ heat_by_geo_zone = (
        .withColumn("heat_indicator", 
                    col("sum_weighted_heat") / col("sum_log_num_mentions"))
        .drop("sum_weighted_heat", "sum_log_num_mentions")
-)  
-
-
+)
 
 # COMMAND ----------
 
 # heat_by_geo_zone.sort("indicator_date", "geo_zone").limit(100).display()
+# spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_date_location")
 
 # COMMAND ----------
 
 (heat_by_geo_zone
- .write.mode("overwrite")
+ .write
+ .mode("overwrite")
  .partitionBy("indicator_date")
  .saveAsTable("gdelt.heat_indicator_by_date_location")
 )
