@@ -3,14 +3,6 @@
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
-
-
-# COMMAND ----------
-
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, when, exp, concat, lit
 from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
@@ -92,7 +84,7 @@ assert len(events_w_heat_sf.columns) == len(set(events_w_heat_sf.columns))
 # COMMAND ----------
 
 # events_w_heat_sf.cache().limit(10).display()
-spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_event")
+# spark.sql("DROP TABLE IF EXISTS gdelt.heat_indicator_by_event")
 
 # COMMAND ----------
 
