@@ -84,3 +84,39 @@ def get_date_range_from_values(start_date: date | None,
         lookback_days = lookback_days if lookback_days is not None else 1
         start_date1: date = (datetime.now(tz=TZ) - timedelta(days=int(lookback_days))).date()
         return start_date1, end_date1
+
+
+import pyspark.sql as ss
+import pyspark.sql.functions as F
+
+
+def replace_range(spark: SparkSession,
+                  data_sf: ss.DataFrame,
+                  part_col: str,
+                  dest_table) -> None:
+
+    actual_date_range = data_sf.agg(
+        F.min(F.col(part_col)).alias("min_date"),
+        F.max(F.col(part_col)).alias("max_date")
+    ).collect()
+
+    if len(actual_date_range) == 0:
+        print("WARNING: Empty actual date range, doing nothing!")
+        return
+
+    actual_date_range_row = actual_date_range[0]
+
+    actual_min_date = actual_date_range_row.min_date
+    actual_max_date = actual_date_range_row.max_date
+    print(f"ACTUAL DATE RANGE: {actual_min_date} to {actual_max_date}")
+
+    spark.sql(f"""
+        delete from {dest_table}
+              where {part_col} >= '{actual_min_date}'
+                AND {part_col} <= '{actual_max_date}'""")
+
+    (data_sf
+     .write
+     .mode("append")
+     .partitionBy(part_col)
+     .saveAsTable(dest_table))
