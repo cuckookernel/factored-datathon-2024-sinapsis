@@ -35,9 +35,9 @@ def get_date_range(spark: SparkSession) -> tuple[date, date]:
     # if we got lookback days, use it
     elif lookback_days:
         start_time_tz = datetime.now(tz=TZ)
-        print("get_date_range: start_time_tz: {start_time_tz!r}")
+        print(f"get_date_range: start_time_tz: {start_time_tz!r}")
         start_date = (start_time_tz- timedelta(days=int(lookback_days))).date()
-        print("get_date_range: start_date: {start_date!r}")
+        print(f"get_date_range: start_date: {start_date!r}")
         end_date = today()    
     else:
         start_date = today()
