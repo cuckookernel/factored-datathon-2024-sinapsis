@@ -29,10 +29,10 @@ ln100 = math.log(100)
 
 # Old filter
 # & F.col("ev_root_code").isin(["13", # Threaten
-                                         # "14", # Protest
-                                         # "18", # Assault
-                                         # "19", # Fight
-                                         # "20"] # Use conventional mass violence)
+                              # "14", # Protest
+                              # "18", # Assault
+                              # "19", # Fight
+                              # "20"] # Use conventional mass violence)
 
 events_w_heat_sf = (
     spark.read.table("gdelt.silver_events")

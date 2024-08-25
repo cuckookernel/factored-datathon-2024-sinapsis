@@ -20,7 +20,8 @@ import data_proc.news.scraping as scr
 
 from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
 
-
+print(com.__file__)
+reload(scr)
 reload(com)
 reload(jh)
 
@@ -76,7 +77,7 @@ scrape_result_schema = StructType([
     StructField('part_date', DateType(), True)
 ])
 
-scrape_results = top_news_events.withColumnRenamed("heat_date", "part_date").mapInPandas(
+scrape_results = top_news_events.withColumnRenamed("date_added", "part_date").mapInPandas(
     _scrape_from_df_iter,
     schema=scrape_result_schema
 ).cache()
