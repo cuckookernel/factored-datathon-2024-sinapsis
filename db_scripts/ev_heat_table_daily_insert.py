@@ -4,18 +4,22 @@
 # COMMAND ----------
 
 import logging
+from datetime import date
+
 logging.getLogger().setLevel(logging.WARNING)
 from pyspark.sql import functions as F
 from pyspark.sql.functions import col, when, exp, concat, lit
 from data_proc.widget_helper import set_up_date_range_widgets, get_date_range
 from data_proc.job_helper import get_param_or_default
+from data_proc.job_helper import replace_range
+
 
 
 # COMMAND ----------
 
 set_up_date_range_widgets(spark)
 
-input_table = get_param_or_default(spark, "input_table", "gdelt.silver_events")
+input_table_name = get_param_or_default(spark, "input_table", "gdelt.silver_events")
 
 start_date, end_date = get_date_range(spark)
 print(f"DATE_RANGE:: {start_date} - {end_date}")
@@ -33,7 +37,7 @@ ln100 = math.log(100)
                               # "20"] # Use conventional mass violence)
 
 events_w_heat_sf = (
-    spark.read.table(input_table)
+    spark.read.table(input_table_name)
     .where(col("date_added")
            .between(start_date, end_date))
     .select("date_added",
@@ -94,24 +98,11 @@ events_w_heat_sf.groupby("date_added").count().show()
 
 # COMMAND ----------
 
-from datetime import date
 
-output_table = "gdelt.heat_indicator_by_event"
+dest_table = "gdelt.heat_indicator_by_event"
+replace_range(spark, events_w_heat_sf, 
+              part_col="date_added", dest_table=dest_table)
 
-actual_date_range = events_w_heat_sf.agg(F.min(col("date_added")).alias("min_date"),  
-                                         F.max(col("date_added")).alias("max_date")
-                    ).collect()
-actual_date_range_row = actual_date_range[0]
-print(f"ACTUAL DATE RANGE: {actual_date_range_row.min_date} to {actual_date_range_row.max_date}")
-
-spark.sql(f"""delete from {output_table} "
-           where date_added >= '{actual_date_range_row.min_date}'
-           AND date_added <= '{actual_date_range_row.max_date}'""")
-(events_w_heat_sf
-    .write
-    .mode("append")
-    .partitionBy("date_added")    
-    .saveAsTable(output_table))
 
 # COMMAND ----------
 
