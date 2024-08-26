@@ -1,5 +1,5 @@
 {
-  "name": "GDELT_ingestion_pipeline",
+  "name": "GDELT_ingestion_pipeline all sources",
   "email_notifications": {
     "no_alert_for_skipped_runs": false
   },
